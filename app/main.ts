@@ -25,7 +25,7 @@ rl.on('line', (input) => {
     if (commandTypes.has(arg)) {
       console.log(`${arg} is a shell builtin`);
     } else {
-      console.log(`${command}: not found`);
+      console.log(`${arg}: not found`);
     }
   }
   else {
