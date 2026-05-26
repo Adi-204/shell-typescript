@@ -1,4 +1,6 @@
 import { createInterface } from "readline";
+import path from 'path';
+import fs from 'fs';
 
 const rl = createInterface({
   input: process.stdin,
@@ -24,8 +26,24 @@ rl.on('line', (input) => {
   else if (command === "type") {
     if (commandTypes.has(arg)) {
       console.log(`${arg} is a shell builtin`);
-    } else {
-      console.log(`${arg}: not found`);
+    }
+    else {
+      let isFound = false;
+      const allDirs = process.env.PATH.split(path.delimiter);
+      for (const dir of allDirs) {
+        const isExecutableFile = path.join(dir, arg);
+        if (fs.existsSync(isExecutableFile)) {
+          fs.access(isExecutableFile, fs.constants.X_OK, (err) => {
+            isFound = true;
+            if (!err) {
+              console.log(`${arg} is ${isExecutableFile}`);
+            } 
+          });
+        }
+      }
+      if (!isFound) {
+        console.log(`${arg}: not found`);
+      }
     }
   }
   else {
