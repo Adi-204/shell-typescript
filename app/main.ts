@@ -9,10 +9,18 @@ const rl = createInterface({
 rl.prompt();
 
 rl.on('line', (input) => {
-  if (input === "exit") {
+  const splitInput = input.split(' ');
+  const command = splitInput[0];
+  if (command === "exit") {
     rl.close();
     return;
   }
-  console.log(`${input}: command not found`);
+  else if (command === "echo") {
+    const arg = splitInput.slice(1).join(' ');
+    console.log(arg);
+  }
+  else {
+    console.log(`${command}: command not found`);
+  }
   rl.prompt();
 });
