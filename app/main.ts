@@ -6,7 +6,7 @@ const rl = createInterface({
   prompt: "$ ",
 });
 
-const commandTypes = new Set<string>(["echo", "exit"]);
+const commandTypes = new Set<string>(["echo", "exit", "type"]);
 
 rl.prompt();
 
