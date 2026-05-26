@@ -35,7 +35,7 @@ rl.on('line', (input) => {
         if (fs.existsSync(isExecutableFile)) {
           isFound = true;
           try {
-            fs.accessSync(isExecutableFile, fs.constants.F_OK);
+            fs.accessSync(isExecutableFile, fs.constants.X_OK);
             console.log(`${arg} is ${isExecutableFile}`);
             break;
           } catch (err) {
