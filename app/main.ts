@@ -33,12 +33,14 @@ rl.on('line', (input) => {
       for (const dir of allDirs) {
         const isExecutableFile = path.join(dir, arg);
         if (fs.existsSync(isExecutableFile)) {
-          fs.access(isExecutableFile, fs.constants.X_OK, (err) => {
-            isFound = true;
-            if (!err) {
-              console.log(`${arg} is ${isExecutableFile}`);
-            } 
-          });
+          isFound = true;
+          try {
+            fs.accessSync(isExecutableFile, fs.constants.F_OK);
+            console.log(`${arg} is ${isExecutableFile}`);
+            break;
+          } catch (err) {
+            continue;
+          }
         }
       }
       if (!isFound) {
