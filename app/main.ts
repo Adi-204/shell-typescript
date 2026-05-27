@@ -10,14 +10,13 @@ const rl = createInterface({
 });
 
 const allDirs = process.env.PATH.split(path.delimiter);
-
 const commandTypes = new Set<string>(["echo", "exit", "type"]);
 
-const getFileStatus = (filePath) => {
+const getFileStatus = (filePath: string) => {
   const fileStatus = {
     isExecutable: false,
     isFound: false
-  }
+  };
   if (fs.existsSync(filePath)) {
     fileStatus.isFound = true;
     try {
@@ -28,14 +27,15 @@ const getFileStatus = (filePath) => {
     }
   }
   return fileStatus;
-}
+};
 
 rl.prompt();
 
 rl.on('line', (input) => {
-  const splitInput = input.split(' ');
+  const splitInput = input.trim().split(' ');
   const command = splitInput[0];
   const args = splitInput.slice(1);
+
   if (command === "exit") {
     rl.close();
     return;
@@ -43,22 +43,22 @@ rl.on('line', (input) => {
   else if (command === "echo") {
     const arg = args.join(' ');
     console.log(arg);
+    rl.prompt();
   }
   else if (command === "type") {
     const arg = args[0];
     if (commandTypes.has(arg)) {
       console.log(`${arg} is a shell builtin`);
-    }
-    else {
+    } else {
       let isFound = false;
       for (const dir of allDirs) {
-        const isExecutableFile = path.join(dir, arg);
-        const fileStatus = getFileStatus(isExecutableFile);
+        const filePath = path.join(dir, arg);
+        const fileStatus = getFileStatus(filePath);
         if (fileStatus.isFound) {
           isFound = true;
         }
         if (fileStatus.isExecutable) {
-          console.log(`${arg} is ${isExecutableFile}`);
+          console.log(`${arg} is ${filePath}`);
           break;
         }
       }
@@ -66,25 +66,27 @@ rl.on('line', (input) => {
         console.log(`${arg}: not found`);
       }
     }
+    rl.prompt();
   }
   else {
-    // not a builtin function
+    // Try to find and execute external command
     let isExe = false;
     for (const dir of allDirs) {
-      const isExecutableFile = path.join(dir, command);
-      const fileStatus = getFileStatus(isExecutableFile);
+      const filePath = path.join(dir, command);
+      const fileStatus = getFileStatus(filePath);
       if (fileStatus.isExecutable) {
         isExe = true;
-        execFile(isExecutableFile, args, (error, stdout, stderr) => {
-            if (!error && !stderr) {
-              console.log(stdout);
-            }
+        execFile(filePath, args, (error, stdout, stderr) => {
+          if (stdout) process.stdout.write(stdout);
+          if (stderr) process.stderr.write(stderr);
+          rl.prompt();
         });
+        return; 
       }
     }
     if (!isExe) {
       console.log(`${command}: command not found`);
+      rl.prompt();
     }
   }
-  rl.prompt();
 });
