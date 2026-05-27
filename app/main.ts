@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
 
-const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd"]);
+const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "$ " });
@@ -26,6 +26,14 @@ const findExecutable = (command: string): string | null => {
   return null;
 };
 
+const changeDirectory = (target: string) => {
+  try {
+    process.chdir(target);
+  } catch (err) {
+    console.log(`cd: ${target}: No such file or directory`)
+  }
+}
+
 const builtins: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
   echo: (args) => {
@@ -44,6 +52,11 @@ const builtins: Record<string, (args: string[]) => void> = {
   },
   pwd: () => {
     console.log(process.cwd());
+    prompt();
+  },
+  cd: (args) => {
+    const target = args[0];
+    changeDirectory(target);
     prompt();
   }
 };
