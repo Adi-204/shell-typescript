@@ -69,10 +69,12 @@ rl.on('line', (input) => {
   }
   else {
     // not a builtin function
+    let isExe = false;
     for (const dir of allDirs) {
       const isExecutableFile = path.join(dir, command);
       const fileStatus = getFileStatus(isExecutableFile);
       if (fileStatus.isExecutable) {
+        isExe = true;
         execFile(isExecutableFile, args, (error, stdout, stderr) => {
             if (!error && !stderr) {
               console.log(stdout);
@@ -80,7 +82,9 @@ rl.on('line', (input) => {
         });
       }
     }
-    console.log(`${command}: command not found`);
+    if (!isExe) {
+      console.log(`${command}: command not found`);
+    }
   }
   rl.prompt();
 });
