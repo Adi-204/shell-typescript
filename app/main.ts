@@ -3,90 +3,69 @@ import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
 
-const rl = createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  prompt: "$ ",
-});
+const BUILTINS = new Set<string>(["echo", "exit", "type"]);
+const PATH_DIRS = process.env.PATH.split(path.delimiter);
 
-const allDirs = process.env.PATH.split(path.delimiter);
-const commandTypes = new Set<string>(["echo", "exit", "type"]);
+const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "$ " });
+const prompt = () => rl.prompt();
 
-const getFileStatus = (filePath: string) => {
-  const fileStatus = {
-    isExecutable: false,
-    isFound: false
-  };
-  if (fs.existsSync(filePath)) {
-    fileStatus.isFound = true;
-    try {
-      fs.accessSync(filePath, fs.constants.X_OK);
-      fileStatus.isExecutable = true;
-    } catch (err) {
-      fileStatus.isExecutable = false;
-    }
+const isExecutable = (filePath: string): boolean => {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
-  return fileStatus;
 };
 
-rl.prompt();
+const findExecutable = (command: string): string | null => {
+  for (const dir of PATH_DIRS) {
+    const filePath = path.join(dir, command);
+    if (isExecutable(filePath)) return filePath;
+  }
+  return null;
+};
+
+const builtins: Record<string, (args: string[]) => void> = {
+  exit: () => rl.close(),
+  echo: (args) => {
+    console.log(args.join(' '));
+    prompt();
+  },
+  type: (args) => {
+    const target = args[0];
+    if (BUILTINS.has(target)) {
+      console.log(`${target} is a shell builtin`);
+    } else {
+      const filePath = findExecutable(target);
+      console.log(filePath ? `${target} is ${filePath}` : `${target}: not found`);
+    }
+    prompt();
+  },
+  pwd: () => {
+    console.log(process.cwd());
+    prompt();
+  }
+};
 
 rl.on('line', (input) => {
-  const splitInput = input.trim().split(' ');
-  const command = splitInput[0];
-  const args = splitInput.slice(1);
-
-  if (command === "exit") {
-    rl.close();
+  const [command, ...args] = input.trim().split(' ');
+  if (builtins[command]) {
+    builtins[command](args);
     return;
   }
-  else if (command === "echo") {
-    const arg = args.join(' ');
-    console.log(arg);
-    rl.prompt();
+  const filePath = findExecutable(command);
+  if (!filePath) {
+    console.log(`${command}: command not found`);
+    prompt();
+    return;
   }
-  else if (command === "type") {
-    const arg = args[0];
-    if (commandTypes.has(arg)) {
-      console.log(`${arg} is a shell builtin`);
-    } else {
-      let isFound = false;
-      for (const dir of allDirs) {
-        const filePath = path.join(dir, arg);
-        const fileStatus = getFileStatus(filePath);
-        if (fileStatus.isFound) {
-          isFound = true;
-        }
-        if (fileStatus.isExecutable) {
-          console.log(`${arg} is ${filePath}`);
-          break;
-        }
-      }
-      if (!isFound) {
-        console.log(`${arg}: not found`);
-      }
-    }
-    rl.prompt();
-  }
-  else {
-    // Try to find and execute external command
-    let isExe = false;
-    for (const dir of allDirs) {
-      const filePath = path.join(dir, command);
-      const fileStatus = getFileStatus(filePath);
-      if (fileStatus.isExecutable) {
-        isExe = true;
-        execFile(command, args, (error, stdout, stderr) => {
-          if (stdout) process.stdout.write(stdout);
-          if (stderr) process.stderr.write(stderr);
-          rl.prompt();
-        });
-        return; 
-      }
-    }
-    if (!isExe) {
-      console.log(`${command}: command not found`);
-      rl.prompt();
-    }
-  }
+  execFile(filePath, args, (_, stdout, stderr) => {
+    if (stdout) process.stdout.write(stdout);
+    if (stderr) process.stderr.write(stderr);
+    prompt();
+  });
 });
+
+
+prompt();
