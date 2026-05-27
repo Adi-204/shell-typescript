@@ -5,6 +5,7 @@ import { execFile } from 'child_process';
 
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
+const HOME_DIR = process.env.HOME;
 
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "$ " });
 const prompt = () => rl.prompt();
@@ -55,7 +56,7 @@ const builtins: Record<string, (args: string[]) => void> = {
     prompt();
   },
   cd: (args) => {
-    const target = args[0];
+    const target = (args[0] === "~") ? HOME_DIR : args[0];
     changeDirectory(target);
     prompt();
   }
