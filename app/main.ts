@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
 
-const BUILTINS = new Set<string>(["echo", "exit", "type"]);
+const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "$ " });
