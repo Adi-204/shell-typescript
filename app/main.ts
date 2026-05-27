@@ -60,7 +60,7 @@ rl.on('line', (input) => {
     prompt();
     return;
   }
-  execFile(filePath, args, (_, stdout, stderr) => {
+  execFile(command, args, (_, stdout, stderr) => {
     if (stdout) process.stdout.write(stdout);
     if (stderr) process.stderr.write(stderr);
     prompt();
