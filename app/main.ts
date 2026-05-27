@@ -78,8 +78,6 @@ rl.on('line', (input) => {
         execFile(isExecutableFile, args, (error, stdout, stderr) => {
             if (!error && !stderr) {
               console.log(stdout);
-            } else {
-              return;
             }
         });
       }
