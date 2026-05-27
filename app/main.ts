@@ -76,7 +76,7 @@ rl.on('line', (input) => {
       const fileStatus = getFileStatus(filePath);
       if (fileStatus.isExecutable) {
         isExe = true;
-        execFile(filePath, args, (error, stdout, stderr) => {
+        execFile(command, args, (error, stdout, stderr) => {
           if (stdout) process.stdout.write(stdout);
           if (stderr) process.stderr.write(stderr);
           rl.prompt();
