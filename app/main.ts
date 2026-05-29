@@ -38,19 +38,26 @@ const changeDirectory = (target: string) => {
 const parseQuotedArgs = (args: string[]): string[] => {
   const joined = args.join(' ');
   const segments = joined.split("'");
-  let result = "";
+  const result: string[] = [];
+  let current = "";
 
   segments.forEach((segment, index) => {
     const insideQuotes = index % 2 === 1;
     if (insideQuotes) {
-      result += segment;
+      current += segment;
     } else {
       const collapsed = segment.replace(/\s+/g, ' ');
-      result += collapsed;
+      const parts = collapsed.split(' ');
+      current += parts[0];
+      for (let i = 1; i < parts.length; i++) {
+        result.push(current);
+        current = parts[i];
+      }
     }
   });
 
-  return result.split(' ');
+  result.push(current);
+  return result.filter(arg => arg.length > 0);
 };
 
 const builtins: Record<string, (args: string[]) => void> = {
