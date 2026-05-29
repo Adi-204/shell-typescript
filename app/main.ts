@@ -31,14 +31,33 @@ const changeDirectory = (target: string) => {
   try {
     process.chdir(target);
   } catch (err) {
-    console.log(`cd: ${target}: No such file or directory`)
+    console.log(`cd: ${target}: No such file or directory`);
   }
-}
+};
+
+const parseQuotedArgs = (args: string[]): string => {
+  const joined = args.join(' ');
+  const segments = joined.split("'");
+  let result = "";
+
+  segments.forEach((segment, index) => {
+    const insideQuotes = index % 2 === 1;
+    if (insideQuotes) {
+      result += segment;
+    } else {
+      const collapsed = segment.replace(/\s+/g, ' ').trim();
+      result += collapsed;
+    }
+  });
+
+  return result;
+};
 
 const builtins: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
   echo: (args) => {
-    console.log(args.join(' '));
+    const output = parseQuotedArgs(args);
+    console.log(output);
     prompt();
   },
   type: (args) => {
@@ -74,12 +93,12 @@ rl.on('line', (input) => {
     prompt();
     return;
   }
-  execFile(command, args, (_, stdout, stderr) => {
+  const parsedArgs = parseArgs(args);
+  execFile(command, parsedArgs, (_, stdout, stderr) => {
     if (stdout) process.stdout.write(stdout);
     if (stderr) process.stderr.write(stderr);
     prompt();
   });
 });
-
 
 prompt();
