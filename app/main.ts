@@ -50,7 +50,7 @@ const parseQuotedArgs = (args: string[]): string[] => {
     }
   });
 
-  return result.trim().split(' ').filter(arg => arg.length > 0);
+  return result.split(' ');
 };
 
 const builtins: Record<string, (args: string[]) => void> = {
