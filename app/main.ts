@@ -38,7 +38,6 @@ const changeDirectory = (target: string) => {
 const parseQuotedArgs = (args: string[]): string => {
   const joined = args.join(' ');
   const segments = joined.split("'");
-  console.log(segments)
   let result = "";
 
   segments.forEach((segment, index) => {
