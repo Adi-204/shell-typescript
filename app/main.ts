@@ -35,7 +35,7 @@ const changeDirectory = (target: string) => {
   }
 };
 
-const parseQuotedArgs = (args: string[]): string => {
+const parseQuotedArgs = (args: string[]): string[] => {
   const joined = args.join(' ');
   const segments = joined.split("'");
   let result = "";
@@ -50,13 +50,13 @@ const parseQuotedArgs = (args: string[]): string => {
     }
   });
 
-  return result;
+  return result.trim().split(' ').filter(arg => arg.length > 0);
 };
 
 const builtins: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
   echo: (args) => {
-    const output = parseQuotedArgs(args);
+    const output = parseQuotedArgs(args).join(' ');
     console.log(output);
     prompt();
   },
@@ -102,5 +102,3 @@ rl.on('line', (input) => {
 });
 
 prompt();
-
-// echo 'script     example' 'hello''world' shell''test
