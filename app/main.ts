@@ -93,7 +93,7 @@ rl.on('line', (input) => {
     prompt();
     return;
   }
-  const parsedArgs = parseArgs(args);
+  const parsedArgs = parseQuotedArgs(args);
   execFile(command, parsedArgs, (_, stdout, stderr) => {
     if (stdout) process.stdout.write(stdout);
     if (stderr) process.stderr.write(stderr);
