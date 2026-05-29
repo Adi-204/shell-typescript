@@ -38,6 +38,7 @@ const changeDirectory = (target: string) => {
 const parseQuotedArgs = (args: string[]): string => {
   const joined = args.join(' ');
   const segments = joined.split("'");
+  console.log(segments)
   let result = "";
 
   segments.forEach((segment, index) => {
@@ -45,7 +46,7 @@ const parseQuotedArgs = (args: string[]): string => {
     if (insideQuotes) {
       result += segment;
     } else {
-      const collapsed = segment.replace(/\s+/g, ' ').trim();
+      const collapsed = segment.replace(/\s+/g, ' ');
       result += collapsed;
     }
   });
@@ -102,3 +103,5 @@ rl.on('line', (input) => {
 });
 
 prompt();
+
+// echo 'script     example' 'hello''world' shell''test
