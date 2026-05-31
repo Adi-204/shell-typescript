@@ -30,41 +30,40 @@ const findExecutable = (command: string): string | null => {
 const changeDirectory = (target: string) => {
   try {
     process.chdir(target);
-  } catch (err) {
+  } catch {
     console.log(`cd: ${target}: No such file or directory`);
   }
 };
 
-const parseQuotedArgs = (args: string[]): string[] => {
-  const joined = args.join(' ');
-  const segments = joined.split("'");
+const parseArgs = (args: string[]): string[] => {
+  const input = args.join(' ');
   const result: string[] = [];
   let current = "";
+  let quoteChar = "";
 
-  segments.forEach((segment, index) => {
-    const insideQuotes = index % 2 === 1;
-    if (insideQuotes) {
-      current += segment;
-    } else {
-      const collapsed = segment.replace(/\s+/g, ' ');
-      const parts = collapsed.split(' ');
-      current += parts[0];
-      for (let i = 1; i < parts.length; i++) {
+  for (const char of input) {
+    if (char === quoteChar) {
+      quoteChar = "";
+    } else if ((char === "'" || char === '"') && quoteChar === "") {
+      quoteChar = char;
+    } else if (char === ' ' && quoteChar === "") {
+      if (current.length > 0) {
         result.push(current);
-        current = parts[i];
+        current = "";
       }
+    } else {
+      current += char;
     }
-  });
+  }
 
-  result.push(current);
-  return result.filter(arg => arg.length > 0);
+  if (current.length > 0) result.push(current);
+  return result;
 };
 
 const builtins: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
   echo: (args) => {
-    const output = parseQuotedArgs(args).join(' ');
-    console.log(output);
+    console.log(parseArgs(args).join(' '));
     prompt();
   },
   type: (args) => {
@@ -82,7 +81,7 @@ const builtins: Record<string, (args: string[]) => void> = {
     prompt();
   },
   cd: (args) => {
-    const target = (args[0] === "~") ? HOME_DIR : args[0];
+    const target = args[0] === "~" ? HOME_DIR : args[0];
     changeDirectory(target);
     prompt();
   }
@@ -100,8 +99,7 @@ rl.on('line', (input) => {
     prompt();
     return;
   }
-  const parsedArgs = parseQuotedArgs(args);
-  execFile(command, parsedArgs, (_, stdout, stderr) => {
+  execFile(command, parseArgs(args), (_, stdout, stderr) => {
     if (stdout) process.stdout.write(stdout);
     if (stderr) process.stderr.write(stderr);
     prompt();
