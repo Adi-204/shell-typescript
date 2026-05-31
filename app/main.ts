@@ -66,6 +66,23 @@ const parseArgs = (args: string[]): string[] => {
   return result;
 };
 
+const getCommandAndParse = (input: string): string =>  {
+  let quoteChar = "";
+  let result = "";
+  for (let i = 0; i < input.length; i++) { 
+    const char = input[i];
+    result += char;
+    if (quoteChar === char && quoteChar !== "") {
+      break;
+    }
+    if ((char === "'" || char === '"') && quoteChar === "") {
+      quoteChar = char;
+    }
+  }
+  const parsedCommand = parseArgs(result.split(' ')).join(' ');
+  return parsedCommand;
+}
+
 const builtins: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
   echo: (args) => {
@@ -99,13 +116,14 @@ rl.on('line', (input) => {
     builtins[command](args);
     return;
   }
-  const filePath = findExecutable(command);
+  const parsedCommand = getCommandAndParse(input);
+  const filePath = findExecutable(parsedCommand);
   if (!filePath) {
-    console.log(`${command}: command not found`);
+    console.log(`${parsedCommand}: command not found`);
     prompt();
     return;
   }
-  execFile(command, parseArgs(args), (_, stdout, stderr) => {
+  execFile(parsedCommand, parseArgs(args), (_, stdout, stderr) => {
     if (stdout) process.stdout.write(stdout);
     if (stderr) process.stderr.write(stderr);
     prompt();
