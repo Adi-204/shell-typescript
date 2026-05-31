@@ -45,11 +45,9 @@ const parseArgs = (args: string[]): string[] => {
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
     const nextChar = i < input.length - 1 ? input[i + 1] : "";
-    if (char === "\\") {
-      if (quoteChar === "" || (quoteChar === '"' && BACKSLAH_IN_DOUBLE_QUOTES.has(nextChar))) {
-        current += nextChar;
-        i++;
-      } 
+    if (char === "\\" && (quoteChar === "" || (quoteChar === '"' && BACKSLAH_IN_DOUBLE_QUOTES.has(nextChar)))) {
+      current += nextChar;
+      i++;
     } else if (char === quoteChar) {
       quoteChar = "";
     } else if ((char === "'" || char === '"') && quoteChar === "") {
