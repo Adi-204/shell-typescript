@@ -6,6 +6,7 @@ import { execFile } from 'child_process';
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
+const BACKSLAH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "$ " });
 const prompt = () => rl.prompt();
@@ -44,9 +45,11 @@ const parseArgs = (args: string[]): string[] => {
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
     const nextChar = i < input.length - 1 ? input[i + 1] : "";
-    if (char === "\\" && quoteChar === "") {
-      current += nextChar;
-      i++;
+    if (char === "\\") {
+      if (quoteChar === "" || (quoteChar === '"' && BACKSLAH_IN_DOUBLE_QUOTES.has(nextChar))) {
+        current += nextChar;
+        i++;
+      } 
     } else if (char === quoteChar) {
       quoteChar = "";
     } else if ((char === "'" || char === '"') && quoteChar === "") {
