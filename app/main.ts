@@ -6,7 +6,7 @@ import { execFile } from 'child_process';
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
-const BACKSLAH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
+const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "$ " });
 const prompt = () => rl.prompt();
@@ -45,7 +45,7 @@ const parseArgs = (args: string[]): string[] => {
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
     const nextChar = i < input.length - 1 ? input[i + 1] : "";
-    if (char === "\\" && (quoteChar === "" || (quoteChar === '"' && BACKSLAH_IN_DOUBLE_QUOTES.has(nextChar)))) {
+    if (char === "\\" && (quoteChar === "" || (quoteChar === '"' && BACKSLASH_IN_DOUBLE_QUOTES.has(nextChar)))) {
       current += nextChar;
       i++;
     } else if (char === quoteChar) {
@@ -66,27 +66,10 @@ const parseArgs = (args: string[]): string[] => {
   return result;
 };
 
-const getCommandAndParse = (input: string): string =>  {
-  let quoteChar = "";
-  let result = "";
-  for (let i = 0; i < input.length; i++) { 
-    const char = input[i];
-    result += char;
-    if (quoteChar === char && quoteChar !== "") {
-      break;
-    }
-    if ((char === "'" || char === '"') && quoteChar === "") {
-      quoteChar = char;
-    }
-  }
-  const parsedCommand = parseArgs(result.split(' ')).join(' ');
-  return parsedCommand;
-}
-
 const builtins: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
   echo: (args) => {
-    console.log(parseArgs(args).join(' '));
+    console.log(args.join(' '));
     prompt();
   },
   type: (args) => {
@@ -111,19 +94,25 @@ const builtins: Record<string, (args: string[]) => void> = {
 };
 
 rl.on('line', (input) => {
-  const [command, ...args] = input.trim().split(' ');
+  const trimmed = input.trim();
+  if (!trimmed) { prompt(); return; }
+
+  const parsed = parseArgs([trimmed]);
+  const [command, ...args] = parsed;
+
   if (builtins[command]) {
     builtins[command](args);
     return;
   }
-  const parsedCommand = getCommandAndParse(input);
-  const filePath = findExecutable(parsedCommand);
+
+  const filePath = findExecutable(command);
   if (!filePath) {
-    console.log(`${parsedCommand}: command not found`);
+    console.log(`${command}: command not found`);
     prompt();
     return;
   }
-  execFile(parsedCommand, parseArgs(args), (_, stdout, stderr) => {
+
+  execFile(command, args, (_, stdout, stderr) => {
     if (stdout) process.stdout.write(stdout);
     if (stderr) process.stderr.write(stderr);
     prompt();
