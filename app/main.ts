@@ -44,7 +44,7 @@ const parseArgs = (args: string[]): string[] => {
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
     const nextChar = i < input.length - 1 ? input[i + 1] : "";
-    if (char === "\\") {
+    if (char === "\\" && quoteChar === "") {
       current += nextChar;
       i++;
     } else if (char === quoteChar) {
