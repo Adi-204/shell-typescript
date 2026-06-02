@@ -87,12 +87,14 @@ const extractRedirect = (tokens: string[]): {
   cmdArgs: string[],
   stdoutFile: string | null,
   stderrFile: string | null,
-  appendStdOutFile: string | null
+  appendStdOutFile: string | null,
+  appendStdErrFile: string | null
 } => {
   const cmdArgs: string[] = [];
   let stdoutFile: string | null = null;
   let stderrFile: string | null = null;
   let appendStdOutFile: string | null = null;
+  let appendStdErrFile: string | null = null;
   for (let i = 0; i < tokens.length; i++) {
     if (tokens[i] === '>' || tokens[i] === '1>') {
       stdoutFile = tokens[i + 1] ?? null;
@@ -103,18 +105,21 @@ const extractRedirect = (tokens: string[]): {
     } else if (tokens[i] === '>>' || tokens[i] === '1>>') {
       appendStdOutFile = tokens[i + 1] ?? null;
       i++;
-    } 
+    } else if (tokens[i] === '2>>') {
+      appendStdErrFile = tokens[i + 1] ?? null;
+      i++;
+    }
     else {
       cmdArgs.push(tokens[i]);
     }
   }
-  return { cmdArgs, stdoutFile, stderrFile, appendStdOutFile };
+  return { cmdArgs, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile };
 };
 
-const builtins: Record<string, (args: string[], stdoutFile: string | null, stderrFile: string | null, appendStdOutFile: string | null) => void> = {
+const builtins: Record<string, (args: string[], stdoutFile: string | null, stderrFile: string | null, appendStdOutFile: string | null, appendStdErrFile: string | null) => void> = {
   exit: () => rl.close(),
 
-  echo: (args, stdoutFile, stderrFile, appendStdOutFile) => {
+  echo: (args, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile) => {
     const output = args.join(' ') + '\n';
     if (stdoutFile) {
       writeOutput(output, stdoutFile);
@@ -126,10 +131,11 @@ const builtins: Record<string, (args: string[], stdoutFile: string | null, stder
       process.stdout.write(output);
     }
     if (stderrFile) writeOutput('', stderrFile);
+    else if (appendStdErrFile) appendOutput('', appendStdErrFile);
     prompt();
   },
 
-  type: (args, stdoutFile, stderrFile, appendStdOutFile) => {
+  type: (args, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile) => {
     const target = args[0];
     const found = findExecutable(target);
     const output = BUILTINS.has(target)
@@ -145,10 +151,11 @@ const builtins: Record<string, (args: string[], stdoutFile: string | null, stder
       process.stdout.write(output);
     }
     if (stderrFile) writeOutput('', stderrFile);
+    else if (appendStdErrFile) appendOutput('', appendStdErrFile);
     prompt();
   },
 
-  pwd: (_, stdoutFile, stderrFile, appendStdOutFile) => {
+  pwd: (_, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile) => {
     const output = process.cwd() + '\n';
     if (stdoutFile) {
       writeOutput(output, stdoutFile);
@@ -160,6 +167,7 @@ const builtins: Record<string, (args: string[], stdoutFile: string | null, stder
       process.stdout.write(output);
     }
     if (stderrFile) writeOutput('', stderrFile);
+    else if (appendStdErrFile) appendOutput('', appendStdErrFile);
     prompt();
   },
 
@@ -175,11 +183,11 @@ rl.on('line', (input) => {
   if (!trimmed) { prompt(); return; }
 
   const parsed = parseArgs([trimmed]);
-  const { cmdArgs, stdoutFile, stderrFile, appendStdOutFile } = extractRedirect(parsed);
+  const { cmdArgs, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile } = extractRedirect(parsed);
   const [command, ...args] = cmdArgs;
 
   if (builtins[command]) {
-    builtins[command](args, stdoutFile, stderrFile, appendStdOutFile);
+    builtins[command](args, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile);
     return;
   }
 
@@ -195,6 +203,7 @@ rl.on('line', (input) => {
     else if (appendStdOutFile) appendOutput(stdout ?? '', appendStdOutFile);
     else if (stdout) process.stdout.write(stdout);
     if (stderrFile) writeOutput(stderr ?? '', stderrFile);
+    else if (appendStdErrFile) appendOutput(stderr ?? '', appendStdErrFile);
     else if (stderr) process.stderr.write(stderr);
 
     prompt();
