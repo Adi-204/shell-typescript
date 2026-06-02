@@ -64,21 +64,33 @@ const parseArgs = (args: string[]): string[] => {
   return result;
 };
 
-const extractRedirect = (tokens: string[]): { cmdArgs: string[], stdoutFile: string | null } => {
+const extractRedirect = (tokens: string[]): { cmdArgs: string[], stdoutFile: string | null, isErrorInFile: boolean } => {
   const cmdArgs: string[] = [];
   let stdoutFile: string | null = null;
+  let isErrorInFile: boolean = false;
   for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i] === '>' || tokens[i] === '1>') {
+    if (tokens[i] === '>' || tokens[i] === '1>' || tokens[i] === '2>') {
+      isErrorInFile = (tokens[i] === '2>') ? true : false;
       stdoutFile = tokens[i + 1] ?? null;
       i++;
     } else {
       cmdArgs.push(tokens[i]);
     }
   }
-  return { cmdArgs, stdoutFile };
+  return { cmdArgs, stdoutFile, isErrorInFile };
 };
 
-const writeOutput = (data: string, filePath: string) => {
+const writeOutput = (data: string, filePath: string, isErrorInFile: boolean) => {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    if (isErrorInFile) {
+      const error = `shell: ${filePath}: No such file or directory\n`;
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, error, 'utf8');
+    } else {
+      process.stderr.write(error);
+    }
+  }
   try {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, data, 'utf8');
@@ -87,12 +99,12 @@ const writeOutput = (data: string, filePath: string) => {
   }
 };
 
-const builtins: Record<string, (args: string[], stdoutFile: string | null) => void> = {
+const builtins: Record<string, (args: string[], stdoutFile: string | null, isErrorInFile: boolean) => void> = {
   exit: () => rl.close(),
   echo: (args, stdoutFile) => {
     const output = args.join(' ') + '\n';
     if (stdoutFile) {
-      writeOutput(output, stdoutFile);
+      writeOutput(output, stdoutFile, isErrorInFile);
     } else {
       process.stdout.write(output);
     }
@@ -108,7 +120,7 @@ const builtins: Record<string, (args: string[], stdoutFile: string | null) => vo
       output = filePath ? `${target} is ${filePath}\n` : `${target}: not found\n`;
     }
     if (stdoutFile) {
-      writeOutput(output, stdoutFile);
+      writeOutput(output, stdoutFile, isErrorInFile);
     } else {
       process.stdout.write(output);
     }
@@ -117,7 +129,7 @@ const builtins: Record<string, (args: string[], stdoutFile: string | null) => vo
   pwd: (_, stdoutFile) => {
     const output = process.cwd() + '\n';
     if (stdoutFile) {
-      writeOutput(output, stdoutFile);
+      writeOutput(output, stdoutFile, isErrorInFile);
     } else {
       process.stdout.write(output);
     }
@@ -134,11 +146,11 @@ rl.on('line', (input) => {
   const trimmed = input.trim();
   if (!trimmed) { prompt(); return; }
   const parsed = parseArgs([trimmed]);
-  const { cmdArgs, stdoutFile } = extractRedirect(parsed);
+  const { cmdArgs, stdoutFile, isErrorInFile } = extractRedirect(parsed);
   const [command, ...args] = cmdArgs;
 
   if (builtins[command]) {
-    builtins[command](args, stdoutFile);
+    builtins[command](args, stdoutFile, isErrorInFile);
     return;
   }
 
@@ -151,7 +163,7 @@ rl.on('line', (input) => {
 
   execFile(command, args, (_, stdout, stderr) => {
     if (stdoutFile) {
-      writeOutput(stdout ?? '', stdoutFile);
+      writeOutput(stdout ?? '', stdoutFile, isErrorInFile);
     } else {
       if (stdout) process.stdout.write(stdout);
     }
