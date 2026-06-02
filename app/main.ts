@@ -2,7 +2,6 @@ import { createInterface } from "readline";
 import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
-import { writeFile } from 'node:fs/promises';
 
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
@@ -10,6 +9,7 @@ const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 
 const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "$ " });
+
 const prompt = () => rl.prompt();
 
 const isExecutable = (filePath: string): boolean => {
@@ -20,7 +20,6 @@ const isExecutable = (filePath: string): boolean => {
     return false;
   }
 };
-
 const findExecutable = (command: string): string | null => {
   for (const dir of PATH_DIRS) {
     const filePath = path.join(dir, command);
@@ -42,7 +41,6 @@ const parseArgs = (args: string[]): string[] => {
   const result: string[] = [];
   let current = "";
   let quoteChar = "";
-
   for (let i = 0; i < input.length; i++) {
     const char = input[i];
     const nextChar = i < input.length - 1 ? input[i + 1] : "";
@@ -62,69 +60,67 @@ const parseArgs = (args: string[]): string[] => {
       current += char;
     }
   }
-
   if (current.length > 0) result.push(current);
   return result;
 };
 
-const getDataAndFile = (args: string[]) => {
-  let isLeft = true;
-  let data = "";
-  let file = "";
-  for (let i = 0; i < args.length; i++){
-    if (args[i] === "1>" || args[i] === ">") {
-      isLeft = false;
-      continue;
-    }
-    if (isLeft) {
-      data += args[i];
+const extractRedirect = (tokens: string[]): { cmdArgs: string[], stdoutFile: string | null } => {
+  const cmdArgs: string[] = [];
+  let stdoutFile: string | null = null;
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i] === '>' || tokens[i] === '1>') {
+      stdoutFile = tokens[i + 1] ?? null;
+      i++;
     } else {
-      file += args[i];
+      cmdArgs.push(tokens[i]);
     }
   }
-  return {
-    data,
-    file
-  }
-}
+  return { cmdArgs, stdoutFile };
+};
 
-async function writeData(data: string, outputFile: string) {
+const writeOutput = (data: string, filePath: string) => {
   try {
-    await writeFile(outputFile, data, 'utf8');
-    console.log('File written successfully!');
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, data, 'utf8');
   } catch (err) {
-    console.error(err);
+    process.stderr.write(`shell: ${err}\n`);
   }
-}
+};
 
-const builtins: Record<string, (args: string[]) => void> = {
+const builtins: Record<string, (args: string[], stdoutFile: string | null) => void> = {
   exit: () => rl.close(),
-  echo: (args) => {
-    const inputArg = getDataAndFile(args);
-    if (inputArg.file) {
-      const isExe = isExecutable(inputArg.file);
-      if (!isExe) {
-        console.log()
-      }
-      writeData(inputArg.data, inputArg.file);
-    }
-    else {
-      console.log(args.join(' '));
+  echo: (args, stdoutFile) => {
+    const output = args.join(' ') + '\n';
+    if (stdoutFile) {
+      writeOutput(output, stdoutFile);
+    } else {
+      process.stdout.write(output);
     }
     prompt();
   },
-  type: (args) => {
+  type: (args, stdoutFile) => {
     const target = args[0];
+    let output: string;
     if (BUILTINS.has(target)) {
-      console.log(`${target} is a shell builtin`);
+      output = `${target} is a shell builtin\n`;
     } else {
       const filePath = findExecutable(target);
-      console.log(filePath ? `${target} is ${filePath}` : `${target}: not found`);
+      output = filePath ? `${target} is ${filePath}\n` : `${target}: not found\n`;
+    }
+    if (stdoutFile) {
+      writeOutput(output, stdoutFile);
+    } else {
+      process.stdout.write(output);
     }
     prompt();
   },
-  pwd: () => {
-    console.log(process.cwd());
+  pwd: (_, stdoutFile) => {
+    const output = process.cwd() + '\n';
+    if (stdoutFile) {
+      writeOutput(output, stdoutFile);
+    } else {
+      process.stdout.write(output);
+    }
     prompt();
   },
   cd: (args) => {
@@ -137,12 +133,12 @@ const builtins: Record<string, (args: string[]) => void> = {
 rl.on('line', (input) => {
   const trimmed = input.trim();
   if (!trimmed) { prompt(); return; }
-
   const parsed = parseArgs([trimmed]);
-  const [command, ...args] = parsed;
+  const { cmdArgs, stdoutFile } = extractRedirect(parsed);
+  const [command, ...args] = cmdArgs;
 
   if (builtins[command]) {
-    builtins[command](args);
+    builtins[command](args, stdoutFile);
     return;
   }
 
@@ -154,10 +150,13 @@ rl.on('line', (input) => {
   }
 
   execFile(command, args, (_, stdout, stderr) => {
-    if (stdout) process.stdout.write(stdout);
+    if (stdoutFile) {
+      writeOutput(stdout ?? '', stdoutFile);
+    } else {
+      if (stdout) process.stdout.write(stdout);
+    }
     if (stderr) process.stderr.write(stderr);
     prompt();
   });
 });
-
 prompt();
