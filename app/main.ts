@@ -29,6 +29,16 @@ const findExecutable = (command: string): string | null => {
   return null;
 };
 
+const writeOutput = (data: string, filePath: string) => {
+  try {
+    fs.writeFileSync(filePath, data, 'utf8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    const msg = code === 'ENOENT' ? 'No such file or directory' : (err as NodeJS.ErrnoException).message;
+    process.stderr.write(`shell: ${filePath}: ${msg}\n`);
+  }
+};
+
 const changeDirectory = (target: string, stderrFile: string | null) => {
   try {
     process.chdir(target);
@@ -85,48 +95,38 @@ const extractRedirect = (tokens: string[]): { cmdArgs: string[], stdoutFile: str
   return { cmdArgs, stdoutFile, stderrFile };
 };
 
-const writeOutput = (data: string, filePath: string) => {
-  try {
-    fs.writeFileSync(filePath, data, 'utf8');
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    const msg = code === 'ENOENT' ? 'No such file or directory' : (err as NodeJS.ErrnoException).message;
-    process.stderr.write(`shell: ${filePath}: ${msg}\n`);
-  }
-};
-
 const builtins: Record<string, (args: string[], stdoutFile: string | null, stderrFile: string | null) => void> = {
   exit: () => rl.close(),
 
-  echo: (args, stdoutFile) => {
+  echo: (args, stdoutFile, stderrFile) => {
     const output = args.join(' ') + '\n';
     if (stdoutFile) writeOutput(output, stdoutFile);
     else process.stdout.write(output);
+    if (stderrFile) writeOutput('', stderrFile);
     prompt();
   },
 
-  type: (args, stdoutFile) => {
+  type: (args, stdoutFile, stderrFile) => {
     const target = args[0];
-    let output: string;
-    if (BUILTINS.has(target)) {
-      output = `${target} is a shell builtin\n`;
-    } else {
-      const found = findExecutable(target);
-      output = found ? `${target} is ${found}\n` : `${target}: not found\n`;
-    }
+    const found = findExecutable(target);
+    const output = BUILTINS.has(target)
+      ? `${target} is a shell builtin\n`
+      : found ? `${target} is ${found}\n` : `${target}: not found\n`;
     if (stdoutFile) writeOutput(output, stdoutFile);
     else process.stdout.write(output);
+    if (stderrFile) writeOutput('', stderrFile);
     prompt();
   },
 
-  pwd: (_, stdoutFile) => {
+  pwd: (_, stdoutFile, stderrFile) => {
     const output = process.cwd() + '\n';
     if (stdoutFile) writeOutput(output, stdoutFile);
     else process.stdout.write(output);
+    if (stderrFile) writeOutput('', stderrFile);
     prompt();
   },
 
-  cd: (args, stderrFile) => {
+  cd: (args, _, stderrFile) => {
     const target = args[0] === "~" ? HOME_DIR : args[0];
     changeDirectory(target, stderrFile);
     prompt();
@@ -156,7 +156,6 @@ rl.on('line', (input) => {
   execFile(command, args, (_, stdout, stderr) => {
     if (stdoutFile) writeOutput(stdout ?? '', stdoutFile);
     else if (stdout) process.stdout.write(stdout);
-
     if (stderrFile) writeOutput(stderr ?? '', stderrFile);
     else if (stderr) process.stderr.write(stderr);
 
