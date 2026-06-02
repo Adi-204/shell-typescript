@@ -29,13 +29,19 @@ const findExecutable = (command: string): string | null => {
   return null;
 };
 
+const appendOutput = (data: string, filePath: string) => {
+  try {
+    fs.appendFileSync(filePath, data);
+  } catch (err) {
+    console.error('Error writing to file:', err);
+  }
+}
+
 const writeOutput = (data: string, filePath: string) => {
   try {
     fs.writeFileSync(filePath, data, 'utf8');
   } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    const msg = code === 'ENOENT' ? 'No such file or directory' : (err as NodeJS.ErrnoException).message;
-    process.stderr.write(`shell: ${filePath}: ${msg}\n`);
+    console.error('Error writing to file:', err);
   }
 };
 
@@ -77,10 +83,16 @@ const parseArgs = (args: string[]): string[] => {
   return result;
 };
 
-const extractRedirect = (tokens: string[]): { cmdArgs: string[], stdoutFile: string | null, stderrFile: string | null } => {
+const extractRedirect = (tokens: string[]): {
+  cmdArgs: string[],
+  stdoutFile: string | null,
+  stderrFile: string | null,
+  appendStdOutFile: string | null
+} => {
   const cmdArgs: string[] = [];
   let stdoutFile: string | null = null;
   let stderrFile: string | null = null;
+  let appendStdOutFile: string | null = null;
   for (let i = 0; i < tokens.length; i++) {
     if (tokens[i] === '>' || tokens[i] === '1>') {
       stdoutFile = tokens[i + 1] ?? null;
@@ -88,40 +100,65 @@ const extractRedirect = (tokens: string[]): { cmdArgs: string[], stdoutFile: str
     } else if (tokens[i] === '2>') {
       stderrFile = tokens[i + 1] ?? null;
       i++;
-    } else {
+    } else if (tokens[i] === '>>' || tokens[i] === '1>>') {
+      appendStdOutFile = tokens[i + 1] ?? null;
+      i++;
+    } 
+    else {
       cmdArgs.push(tokens[i]);
     }
   }
-  return { cmdArgs, stdoutFile, stderrFile };
+  return { cmdArgs, stdoutFile, stderrFile, appendStdOutFile };
 };
 
-const builtins: Record<string, (args: string[], stdoutFile: string | null, stderrFile: string | null) => void> = {
+const builtins: Record<string, (args: string[], stdoutFile: string | null, stderrFile: string | null, appendStdOutFile: string | null) => void> = {
   exit: () => rl.close(),
 
-  echo: (args, stdoutFile, stderrFile) => {
+  echo: (args, stdoutFile, stderrFile, appendStdOutFile) => {
     const output = args.join(' ') + '\n';
-    if (stdoutFile) writeOutput(output, stdoutFile);
-    else process.stdout.write(output);
+    if (stdoutFile) {
+      writeOutput(output, stdoutFile);
+    }
+    else if (appendStdOutFile) {
+      appendOutput(output, appendStdOutFile);
+    }
+    else {
+      process.stdout.write(output);
+    }
     if (stderrFile) writeOutput('', stderrFile);
     prompt();
   },
 
-  type: (args, stdoutFile, stderrFile) => {
+  type: (args, stdoutFile, stderrFile, appendStdOutFile) => {
     const target = args[0];
     const found = findExecutable(target);
     const output = BUILTINS.has(target)
       ? `${target} is a shell builtin\n`
       : found ? `${target} is ${found}\n` : `${target}: not found\n`;
-    if (stdoutFile) writeOutput(output, stdoutFile);
-    else process.stdout.write(output);
+    if (stdoutFile) {
+      writeOutput(output, stdoutFile);
+    }
+    else if (appendStdOutFile) {
+      appendOutput(output, appendStdOutFile);
+    }
+    else {
+      process.stdout.write(output);
+    }
     if (stderrFile) writeOutput('', stderrFile);
     prompt();
   },
 
-  pwd: (_, stdoutFile, stderrFile) => {
+  pwd: (_, stdoutFile, stderrFile, appendStdOutFile) => {
     const output = process.cwd() + '\n';
-    if (stdoutFile) writeOutput(output, stdoutFile);
-    else process.stdout.write(output);
+    if (stdoutFile) {
+      writeOutput(output, stdoutFile);
+    }
+    else if (appendStdOutFile) {
+      appendOutput(output, appendStdOutFile);
+    }
+    else {
+      process.stdout.write(output);
+    }
     if (stderrFile) writeOutput('', stderrFile);
     prompt();
   },
@@ -138,11 +175,11 @@ rl.on('line', (input) => {
   if (!trimmed) { prompt(); return; }
 
   const parsed = parseArgs([trimmed]);
-  const { cmdArgs, stdoutFile, stderrFile } = extractRedirect(parsed);
+  const { cmdArgs, stdoutFile, stderrFile, appendStdOutFile } = extractRedirect(parsed);
   const [command, ...args] = cmdArgs;
 
   if (builtins[command]) {
-    builtins[command](args, stdoutFile, stderrFile);
+    builtins[command](args, stdoutFile, stderrFile, appendStdOutFile);
     return;
   }
 
@@ -155,6 +192,7 @@ rl.on('line', (input) => {
 
   execFile(command, args, (_, stdout, stderr) => {
     if (stdoutFile) writeOutput(stdout ?? '', stdoutFile);
+    else if (appendStdOutFile) appendOutput(stdout ?? '', appendStdOutFile);
     else if (stdout) process.stdout.write(stdout);
     if (stderrFile) writeOutput(stderr ?? '', stderrFile);
     else if (stderr) process.stderr.write(stderr);
