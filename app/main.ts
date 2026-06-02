@@ -2,6 +2,7 @@ import { createInterface } from "readline";
 import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
+import { writeFile } from 'node:fs/promises';
 
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
@@ -66,10 +67,50 @@ const parseArgs = (args: string[]): string[] => {
   return result;
 };
 
+const getDataAndFile = (args: string[]) => {
+  let isLeft = true;
+  let data = "";
+  let file = "";
+  for (let i = 0; i < args.length; i++){
+    if (args[i] === "1>" || args[i] === ">") {
+      isLeft = false;
+      continue;
+    }
+    if (isLeft) {
+      data += args[i];
+    } else {
+      file += args[i];
+    }
+  }
+  return {
+    data,
+    file
+  }
+}
+
+async function writeData(data: string, outputFile: string) {
+  try {
+    await writeFile(outputFile, data, 'utf8');
+    console.log('File written successfully!');
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 const builtins: Record<string, (args: string[]) => void> = {
   exit: () => rl.close(),
   echo: (args) => {
-    console.log(args.join(' '));
+    const inputArg = getDataAndFile(args);
+    if (inputArg.file) {
+      const isExe = isExecutable(inputArg.file);
+      if (!isExe) {
+        console.log()
+      }
+      writeData(inputArg.data, inputArg.file);
+    }
+    else {
+      console.log(args.join(' '));
+    }
     prompt();
   },
   type: (args) => {
