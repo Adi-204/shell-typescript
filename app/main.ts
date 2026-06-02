@@ -20,6 +20,7 @@ const isExecutable = (filePath: string): boolean => {
     return false;
   }
 };
+
 const findExecutable = (command: string): string | null => {
   for (const dir of PATH_DIRS) {
     const filePath = path.join(dir, command);
@@ -28,11 +29,13 @@ const findExecutable = (command: string): string | null => {
   return null;
 };
 
-const changeDirectory = (target: string) => {
+const changeDirectory = (target: string, stderrFile: string | null) => {
   try {
     process.chdir(target);
   } catch {
-    console.log(`cd: ${target}: No such file or directory`);
+    const error = `cd: ${target}: No such file or directory\n`;
+    if (stderrFile) writeOutput(error, stderrFile);
+    else process.stderr.write(error);
   }
 };
 
@@ -64,80 +67,68 @@ const parseArgs = (args: string[]): string[] => {
   return result;
 };
 
-const extractRedirect = (tokens: string[]): { cmdArgs: string[], stdoutFile: string | null, isErrorInFile: boolean } => {
+const extractRedirect = (tokens: string[]): { cmdArgs: string[], stdoutFile: string | null, stderrFile: string | null } => {
   const cmdArgs: string[] = [];
   let stdoutFile: string | null = null;
-  let isErrorInFile: boolean = false;
+  let stderrFile: string | null = null;
   for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i] === '>' || tokens[i] === '1>' || tokens[i] === '2>') {
-      isErrorInFile = (tokens[i] === '2>') ? true : false;
+    if (tokens[i] === '>' || tokens[i] === '1>') {
       stdoutFile = tokens[i + 1] ?? null;
+      i++;
+    } else if (tokens[i] === '2>') {
+      stderrFile = tokens[i + 1] ?? null;
       i++;
     } else {
       cmdArgs.push(tokens[i]);
     }
   }
-  return { cmdArgs, stdoutFile, isErrorInFile };
+  return { cmdArgs, stdoutFile, stderrFile };
 };
 
-const writeOutput = (data: string, filePath: string, isErrorInFile: boolean) => {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    if (isErrorInFile) {
-      const error = `shell: ${filePath}: No such file or directory\n`;
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.writeFileSync(filePath, error, 'utf8');
-    } else {
-      process.stderr.write(error);
-    }
-  }
+const writeOutput = (data: string, filePath: string) => {
   try {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, data, 'utf8');
   } catch (err) {
-    process.stderr.write(`shell: ${err}\n`);
+    const code = (err as NodeJS.ErrnoException).code;
+    const msg = code === 'ENOENT' ? 'No such file or directory' : (err as NodeJS.ErrnoException).message;
+    process.stderr.write(`shell: ${filePath}: ${msg}\n`);
   }
 };
 
-const builtins: Record<string, (args: string[], stdoutFile: string | null, isErrorInFile: boolean) => void> = {
+const builtins: Record<string, (args: string[], stdoutFile: string | null, stderrFile: string | null) => void> = {
   exit: () => rl.close(),
+
   echo: (args, stdoutFile) => {
     const output = args.join(' ') + '\n';
-    if (stdoutFile) {
-      writeOutput(output, stdoutFile, isErrorInFile);
-    } else {
-      process.stdout.write(output);
-    }
+    if (stdoutFile) writeOutput(output, stdoutFile);
+    else process.stdout.write(output);
     prompt();
   },
+
   type: (args, stdoutFile) => {
     const target = args[0];
     let output: string;
     if (BUILTINS.has(target)) {
       output = `${target} is a shell builtin\n`;
     } else {
-      const filePath = findExecutable(target);
-      output = filePath ? `${target} is ${filePath}\n` : `${target}: not found\n`;
+      const found = findExecutable(target);
+      output = found ? `${target} is ${found}\n` : `${target}: not found\n`;
     }
-    if (stdoutFile) {
-      writeOutput(output, stdoutFile, isErrorInFile);
-    } else {
-      process.stdout.write(output);
-    }
+    if (stdoutFile) writeOutput(output, stdoutFile);
+    else process.stdout.write(output);
     prompt();
   },
+
   pwd: (_, stdoutFile) => {
     const output = process.cwd() + '\n';
-    if (stdoutFile) {
-      writeOutput(output, stdoutFile, isErrorInFile);
-    } else {
-      process.stdout.write(output);
-    }
+    if (stdoutFile) writeOutput(output, stdoutFile);
+    else process.stdout.write(output);
     prompt();
   },
-  cd: (args) => {
+
+  cd: (args, stderrFile) => {
     const target = args[0] === "~" ? HOME_DIR : args[0];
-    changeDirectory(target);
+    changeDirectory(target, stderrFile);
     prompt();
   }
 };
@@ -145,12 +136,13 @@ const builtins: Record<string, (args: string[], stdoutFile: string | null, isErr
 rl.on('line', (input) => {
   const trimmed = input.trim();
   if (!trimmed) { prompt(); return; }
+
   const parsed = parseArgs([trimmed]);
-  const { cmdArgs, stdoutFile, isErrorInFile } = extractRedirect(parsed);
+  const { cmdArgs, stdoutFile, stderrFile } = extractRedirect(parsed);
   const [command, ...args] = cmdArgs;
 
   if (builtins[command]) {
-    builtins[command](args, stdoutFile, isErrorInFile);
+    builtins[command](args, stdoutFile, stderrFile);
     return;
   }
 
@@ -162,13 +154,14 @@ rl.on('line', (input) => {
   }
 
   execFile(command, args, (_, stdout, stderr) => {
-    if (stdoutFile) {
-      writeOutput(stdout ?? '', stdoutFile, isErrorInFile);
-    } else {
-      if (stdout) process.stdout.write(stdout);
-    }
-    if (stderr) process.stderr.write(stderr);
+    if (stdoutFile) writeOutput(stdout ?? '', stdoutFile);
+    else if (stdout) process.stdout.write(stdout);
+
+    if (stderrFile) writeOutput(stderr ?? '', stderrFile);
+    else if (stderr) process.stderr.write(stderr);
+
     prompt();
   });
 });
+
 prompt();
