@@ -8,10 +8,10 @@ const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 
-function completer(line) {
+function completer(line: string) {
   const completions = ["echo ", "exit "];
   const hits = completions.filter((c) => c.startsWith(line));
-  return [hits.length ? hits : completions, line];
+  return [hits.length ? hits : [], line];
 }
 
 const rl = createInterface({
