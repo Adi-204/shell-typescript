@@ -8,7 +8,18 @@ const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 
-const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "$ " });
+function completer(line) {
+  const completions = ["echo ", "exit "];
+  const hits = completions.filter((c) => c.startsWith(line));
+  return [hits.length ? hits : completions, line];
+}
+
+const rl = createInterface({
+  input: process.stdin,
+  completer: completer,
+  output: process.stdout,
+  prompt: "$ "
+});
 
 const prompt = () => rl.prompt();
 
@@ -29,29 +40,19 @@ const findExecutable = (command: string): string | null => {
   return null;
 };
 
-const appendOutput = (data: string, filePath: string) => {
-  try {
-    fs.appendFileSync(filePath, data);
-  } catch (err) {
-    console.error('Error writing to file:', err);
-  }
-}
-
-const writeOutput = (data: string, filePath: string) => {
-  try {
-    fs.writeFileSync(filePath, data, 'utf8');
-  } catch (err) {
-    console.error('Error writing to file:', err);
-  }
+// Unified output writer — handles stdout/stderr with append or overwrite
+const writeToTarget = (data: string, file: string | null, append: string | null, stream: NodeJS.WriteStream) => {
+  if (file) fs.writeFileSync(file, data, 'utf8');
+  else if (append) fs.appendFileSync(append, data);
+  else if (data) stream.write(data);
 };
 
-const changeDirectory = (target: string, stderrFile: string | null) => {
+const changeDirectory = (target: string, stderrFile: string | null, appendStderrFile: string | null) => {
   try {
     process.chdir(target);
   } catch {
     const error = `cd: ${target}: No such file or directory\n`;
-    if (stderrFile) writeOutput(error, stderrFile);
-    else process.stderr.write(error);
+    writeToTarget(error, stderrFile, appendStderrFile, process.stderr);
   }
 };
 
@@ -71,10 +72,7 @@ const parseArgs = (args: string[]): string[] => {
     } else if ((char === "'" || char === '"') && quoteChar === "") {
       quoteChar = char;
     } else if (char === ' ' && quoteChar === "") {
-      if (current.length > 0) {
-        result.push(current);
-        current = "";
-      }
+      if (current.length > 0) { result.push(current); current = ""; }
     } else {
       current += char;
     }
@@ -83,97 +81,64 @@ const parseArgs = (args: string[]): string[] => {
   return result;
 };
 
-const extractRedirect = (tokens: string[]): {
-  cmdArgs: string[],
-  stdoutFile: string | null,
-  stderrFile: string | null,
-  appendStdOutFile: string | null,
-  appendStdErrFile: string | null
-} => {
+interface RedirectInfo {
+  cmdArgs: string[];
+  stdoutFile: string | null;
+  stderrFile: string | null;
+  appendStdOutFile: string | null;
+  appendStdErrFile: string | null;
+}
+
+const extractRedirect = (tokens: string[]): RedirectInfo => {
   const cmdArgs: string[] = [];
   let stdoutFile: string | null = null;
   let stderrFile: string | null = null;
   let appendStdOutFile: string | null = null;
   let appendStdErrFile: string | null = null;
+
   for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i] === '>' || tokens[i] === '1>') {
-      stdoutFile = tokens[i + 1] ?? null;
-      i++;
-    } else if (tokens[i] === '2>') {
-      stderrFile = tokens[i + 1] ?? null;
-      i++;
-    } else if (tokens[i] === '>>' || tokens[i] === '1>>') {
-      appendStdOutFile = tokens[i + 1] ?? null;
-      i++;
-    } else if (tokens[i] === '2>>') {
-      appendStdErrFile = tokens[i + 1] ?? null;
-      i++;
-    }
-    else {
-      cmdArgs.push(tokens[i]);
+    switch (tokens[i]) {
+      case '>': case '1>':  stdoutFile      = tokens[++i] ?? null; break;
+      case '2>':            stderrFile      = tokens[++i] ?? null; break;
+      case '>>': case '1>>':appendStdOutFile= tokens[++i] ?? null; break;
+      case '2>>':           appendStdErrFile= tokens[++i] ?? null; break;
+      default: cmdArgs.push(tokens[i]);
     }
   }
   return { cmdArgs, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile };
 };
 
-const builtins: Record<string, (args: string[], stdoutFile: string | null, stderrFile: string | null, appendStdOutFile: string | null, appendStdErrFile: string | null) => void> = {
+type BuiltinFn = (args: string[], r: RedirectInfo) => void;
+
+const builtins: Record<string, BuiltinFn> = {
   exit: () => rl.close(),
 
-  echo: (args, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile) => {
-    const output = args.join(' ') + '\n';
-    if (stdoutFile) {
-      writeOutput(output, stdoutFile);
-    }
-    else if (appendStdOutFile) {
-      appendOutput(output, appendStdOutFile);
-    }
-    else {
-      process.stdout.write(output);
-    }
-    if (stderrFile) writeOutput('', stderrFile);
-    else if (appendStdErrFile) appendOutput('', appendStdErrFile);
+  echo: (args, r) => {
+    writeToTarget(args.join(' ') + '\n', r.stdoutFile, r.appendStdOutFile, process.stdout);
+    writeToTarget('', r.stderrFile, r.appendStdErrFile, process.stderr);
     prompt();
   },
 
-  type: (args, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile) => {
+  type: (args, r) => {
     const target = args[0];
     const found = findExecutable(target);
     const output = BUILTINS.has(target)
       ? `${target} is a shell builtin\n`
       : found ? `${target} is ${found}\n` : `${target}: not found\n`;
-    if (stdoutFile) {
-      writeOutput(output, stdoutFile);
-    }
-    else if (appendStdOutFile) {
-      appendOutput(output, appendStdOutFile);
-    }
-    else {
-      process.stdout.write(output);
-    }
-    if (stderrFile) writeOutput('', stderrFile);
-    else if (appendStdErrFile) appendOutput('', appendStdErrFile);
+    writeToTarget(output, r.stdoutFile, r.appendStdOutFile, process.stdout);
+    writeToTarget('', r.stderrFile, r.appendStdErrFile, process.stderr);
     prompt();
   },
 
-  pwd: (_, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile) => {
-    const output = process.cwd() + '\n';
-    if (stdoutFile) {
-      writeOutput(output, stdoutFile);
-    }
-    else if (appendStdOutFile) {
-      appendOutput(output, appendStdOutFile);
-    }
-    else {
-      process.stdout.write(output);
-    }
-    if (stderrFile) writeOutput('', stderrFile);
-    else if (appendStdErrFile) appendOutput('', appendStdErrFile);
+  pwd: (_, r) => {
+    writeToTarget(process.cwd() + '\n', r.stdoutFile, r.appendStdOutFile, process.stdout);
+    writeToTarget('', r.stderrFile, r.appendStdErrFile, process.stderr);
     prompt();
   },
 
-  cd: (args, _, stderrFile) => {
+  cd: (args, r) => {
     const target = args[0] === "~" ? HOME_DIR : args[0];
-    changeDirectory(target, stderrFile);
+    changeDirectory(target, r.stderrFile, r.appendStdErrFile);
     prompt();
   }
 };
@@ -183,29 +148,23 @@ rl.on('line', (input) => {
   if (!trimmed) { prompt(); return; }
 
   const parsed = parseArgs([trimmed]);
-  const { cmdArgs, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile } = extractRedirect(parsed);
-  const [command, ...args] = cmdArgs;
+  const redirect = extractRedirect(parsed);
+  const [command, ...args] = redirect.cmdArgs;
 
   if (builtins[command]) {
-    builtins[command](args, stdoutFile, stderrFile, appendStdOutFile, appendStdErrFile);
+    builtins[command](args, redirect);
     return;
   }
 
-  const filePath = findExecutable(command);
-  if (!filePath) {
+  if (!findExecutable(command)) {
     console.log(`${command}: command not found`);
     prompt();
     return;
   }
 
   execFile(command, args, (_, stdout, stderr) => {
-    if (stdoutFile) writeOutput(stdout ?? '', stdoutFile);
-    else if (appendStdOutFile) appendOutput(stdout ?? '', appendStdOutFile);
-    else if (stdout) process.stdout.write(stdout);
-    if (stderrFile) writeOutput(stderr ?? '', stderrFile);
-    else if (appendStdErrFile) appendOutput(stderr ?? '', appendStdErrFile);
-    else if (stderr) process.stderr.write(stderr);
-
+    writeToTarget(stdout ?? '', redirect.stdoutFile, redirect.appendStdOutFile, process.stdout);
+    writeToTarget(stderr ?? '', redirect.stderrFile, redirect.appendStdErrFile, process.stderr);
     prompt();
   });
 });
