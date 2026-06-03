@@ -11,6 +11,9 @@ const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 function completer(line: string) {
   const completions = ["echo ", "exit "];
   const hits = completions.filter((c) => c.startsWith(line));
+  if (hits.length === 0) {
+    process.stdout.write('\x07');
+  }
   return [hits.length ? hits : [], line];
 }
 
