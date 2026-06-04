@@ -8,26 +8,33 @@ const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 
-function completer(line: string) {
-  const executablesInPath: string[] = [];
+function getPathExecutables(): string[] {
+  const executables: string[] = [];
   for (const dir of PATH_DIRS) {
+    let files: string[];
     try {
-      const files = fs.readdirSync(dir);
-      for (const file of files) {
+      files = fs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      try {
         const fullPath = path.join(dir, file);
-        if (isExecutable(fullPath)) {
-          executablesInPath.push(file);
-        }
+        fs.accessSync(fullPath, fs.constants.X_OK);
+        executables.push(file);
+      } catch {
+        continue;
       }
-    } catch (error) {
-      console.log(error);
     }
   }
-  const builtinNames = ["echo", "exit", "type", "pwd", "cd"];
-  const allCompletions = [...builtinNames, ...executablesInPath];
-  const hits = allCompletions
-    .filter((c) => c.startsWith(line))
-    .map((c) => c + " "); 
+  return executables;
+}
+
+function completer(line: string) {
+  const builtinNames = ["echo ", "exit ", "type ", "pwd ", "cd "];
+  const pathExecutables = getPathExecutables().map((e) => e + " ");
+  const allCompletions = [...builtinNames, ...pathExecutables];
+  const hits = allCompletions.filter((c) => c.startsWith(line));
   if (hits.length === 0) {
     process.stdout.write('\x07');
   }
