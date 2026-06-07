@@ -43,8 +43,9 @@ function completer(line: string) {
   const allCompletions = [...builtinNames, ...pathExecutables].map((c) => c + " ").sort();
   const hits = allCompletions.filter((c) => c.startsWith(line));
   if (hits.length === 1) {
-    return [hits, line];
-  } 
+    const completion = hits[0]; 
+    return [[completion], line]; 
+  }
   else if (hits.length === 0 || counter % 2) {
     process.stdout.write('\x07');
   }
