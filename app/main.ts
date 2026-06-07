@@ -7,6 +7,8 @@ const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
+let counter = 0;
+let prevLine = "";
 
 function getPathExecutables(): string[] {
   const executables: string[] = [];
@@ -31,14 +33,25 @@ function getPathExecutables(): string[] {
 }
 
 function completer(line: string) {
+  if (prevLine != line) {
+    counter = 0;
+    prevLine = line;
+  }
+  counter = (counter + 1) % 2;
   const builtinNames = ["echo", "exit", "type", "pwd", "cd"];
   const pathExecutables = getPathExecutables();
   const allCompletions = [...builtinNames, ...pathExecutables].map((c) => c + " ").sort();
   const hits = allCompletions.filter((c) => c.startsWith(line));
-  if (hits.length === 0 || hits.length > 1) {
+  if (hits.length === 0 || counter % 2) {
     process.stdout.write('\x07');
+  } else {
+    const hitsOut = hits.join("");
+    process.stdout.write("\n" + hitsOut + "\n");
+    rl.write(null, { ctrl: true, name: 'u' })
+    prompt();
+    rl.write(line);
   }
-  return [hits, line];
+  return [[], line];
 }
 
 const rl = createInterface({
