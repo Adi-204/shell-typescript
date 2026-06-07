@@ -42,9 +42,13 @@ function completer(line: string) {
   const pathExecutables = getPathExecutables();
   const allCompletions = [...builtinNames, ...pathExecutables].map((c) => c + " ").sort();
   const hits = allCompletions.filter((c) => c.startsWith(line));
-  if (hits.length === 0 || counter % 2) {
+  if (hits.length === 1) {
+    return [hits, line];
+  } 
+  else if (hits.length === 0 || counter % 2) {
     process.stdout.write('\x07');
-  } else {
+  }
+  else {
     const hitsOut = hits.join("");
     process.stdout.write("\n" + hitsOut + "\n");
     rl.write(null, { ctrl: true, name: 'u' })
