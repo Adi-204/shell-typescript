@@ -34,10 +34,11 @@ function getPathExecutables(): string[] {
 
 function completer(line: string) {
   if (prevLine != line) {
-    counter = 0;
+    counter = 1;
     prevLine = line;
+  } else {
+    counter = (counter + 1) % 2;
   }
-  counter = (counter + 1) % 2;
   const builtinNames = ["echo", "exit", "type", "pwd", "cd"];
   const pathExecutables = getPathExecutables();
   const allCompletions = [...builtinNames, ...pathExecutables].map((c) => c + " ").sort();
