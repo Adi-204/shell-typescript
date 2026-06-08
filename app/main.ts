@@ -41,11 +41,13 @@ function completer(line: string) {
   }
   const builtinNames = ["echo", "exit", "type", "pwd", "cd"];
   const pathExecutables = getPathExecutables();
-  const allCompletions = [...builtinNames, ...pathExecutables].map((c) => c + " ").sort();
-  const hits = allCompletions.filter((c) => c.startsWith(line));
+  const allCompletions = [...new Set([...builtinNames, ...pathExecutables])]
+    .map((c) => c + " ")
+    .sort();
+  const hits = [...new Set(allCompletions.filter((c) => c.startsWith(line)))];
   if (hits.length === 1) {
-    const completion = hits[0]; 
-    return [[completion], line]; 
+    const completion = hits[0];
+    return [[completion], line];
   }
   else if (hits.length === 0 || counter % 2) {
     process.stdout.write('\x07');
