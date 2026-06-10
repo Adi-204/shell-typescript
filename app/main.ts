@@ -9,6 +9,7 @@ const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 let prevLine = "";
+const completerScripts = new Map<string, string>();
 
 function getPathExecutables(): string[] {
   const executables: string[] = [];
@@ -205,9 +206,20 @@ const builtins: Record<string, BuiltinFn> = {
 
   complete: (args, r) => {
     const flag = args[0];
-    const command = args[1];
-    if (flag === "-p") {
-      const output = `complete: ${command}: no completion specification\n`;
+    if (flag === "-C") {
+      const path: string = args[1]
+      const command: string = args[2];
+      completerScripts.set(command, path);
+    }
+    else if (flag === "-p") {
+      const command = args[1];
+      let output = "";
+      if (completerScripts.has(command)) {
+        const path = completerScripts.get(command);
+        output = `complete -C '${path}' ${command}\n`;
+      } else {  
+        output = `complete: ${command}: no completion specification\n`;
+      }
       writeToTarget(output, r.stdoutFile, r.appendStdOutFile, process.stdout);
     }
     prompt();
