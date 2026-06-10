@@ -4,7 +4,7 @@ import fs from 'fs';
 import { execFile } from 'child_process';
 import { Trie } from './trie';
 
-const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
+const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd", "complete"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
