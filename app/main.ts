@@ -207,7 +207,7 @@ const builtins: Record<string, BuiltinFn> = {
     const flag = args[0];
     const command = args[1];
     if (flag === "-p") {
-      const output = `complete: ${command}: no completion specification`;
+      const output = `complete: ${command}: no completion specification\n`;
       writeToTarget(output, r.stdoutFile, r.appendStdOutFile, process.stdout);
     }
     prompt();
