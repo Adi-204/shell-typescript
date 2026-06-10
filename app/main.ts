@@ -1,7 +1,7 @@
 import { createInterface } from "readline";
 import path from 'path';
 import fs from 'fs';
-import { execFile } from 'child_process';
+import { execFile, exec } from 'child_process';
 import { Trie } from './trie';
 
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd", "complete"]);
@@ -10,6 +10,22 @@ const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 let prevLine = "";
 const completerScripts = new Map<string, string>();
+
+const executeCommand = (script: string | undefined) => {
+  let output = "";
+  exec(script, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`Stderr: ${stderr}`);
+      return;
+    }
+    output = stdout;
+  });
+  return output;
+}
 
 function getPathExecutables(): string[] {
   const executables: string[] = [];
@@ -45,6 +61,12 @@ function buildTrie(): Trie {
 function completer(line: string): [string[], string] {
   const trie = buildTrie();
   const matchCount = trie.countMatches(line);
+
+  if (completerScripts.has(line.slice(0, -1))) {
+    const script = completerScripts.get(line.slice(0, -1));
+    const output = executeCommand(script);
+    return [[output], line];
+  }
 
   if (matchCount === 0) {
     process.stdout.write('\x07');
