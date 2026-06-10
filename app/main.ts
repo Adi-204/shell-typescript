@@ -2,7 +2,10 @@ import { createInterface } from "readline";
 import path from 'path';
 import fs from 'fs';
 import { execFile, exec } from 'child_process';
+import { promisify } from 'util';
 import { Trie } from './trie';
+
+const execPromise = promisify(exec);
 
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd", "complete"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
@@ -11,20 +14,15 @@ const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 let prevLine = "";
 const completerScripts = new Map<string, string>();
 
-const executeCommand = (script: string | undefined) => {
-  let output = "";
-  exec(script, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`Stderr: ${stderr}`);
-      return;
-    }
-    output = stdout + " ";
-  });
-  return output;
+const executeCommand = async (script: string | undefined): Promise<string> => {
+  if (!script) return "";
+  try {
+    const { stdout } = await execPromise(script);
+    return stdout.trim() + " ";  
+  } catch (error: any) {
+    console.error(`Error: ${error.message}`);
+    return "";
+  }
 }
 
 function getPathExecutables(): string[] {
@@ -58,13 +56,13 @@ function buildTrie(): Trie {
   return trie;
 }
 
-function completer(line: string): [string[], string] {
+async function completer(line: string): Promise<[string[], string]> {
   const trie = buildTrie();
   const matchCount = trie.countMatches(line);
 
   if (completerScripts.has(line.slice(0, -1))) {
     const script = completerScripts.get(line.slice(0, -1));
-    const output = executeCommand(script);
+    const output = await executeCommand(script);
     return [[output], line];
   }
 
@@ -97,7 +95,6 @@ function completer(line: string): [string[], string] {
 
   return [[], line];
 }
-
 
 const rl = createInterface({
   input: process.stdin,
