@@ -15,14 +15,15 @@ const executeCommand = (script: string | undefined) => {
   let output = "";
   exec(script, (error, stdout, stderr) => {
     if (error) {
-      console.error(`Error: ${error.message}`);
+      console.log(`Error: ${error.message}`);
       return;
     }
     if (stderr) {
-      console.error(`Stderr: ${stderr}`);
+      console.log(`Stderr: ${stderr}`);
       return;
     }
     output = stdout;
+    console.log(output);
   });
   return output;
 }
