@@ -2,12 +2,12 @@ import { createInterface } from "readline";
 import path from 'path';
 import fs from 'fs';
 import { execFile } from 'child_process';
+import { Trie } from './trie';
 
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
-let counter = 0;
 let prevLine = "";
 
 function getPathExecutables(): string[] {
@@ -32,35 +32,49 @@ function getPathExecutables(): string[] {
   return executables;
 }
 
-function completer(line: string) {
-  if (prevLine != line) {
-    counter = 1;
-    prevLine = line;
-  } else {
-    counter = (counter + 1) % 2;
-  }
+function buildTrie(): Trie {
   const builtinNames = ["echo", "exit", "type", "pwd", "cd"];
   const pathExecutables = getPathExecutables();
-  const allCompletions = [...new Set([...builtinNames, ...pathExecutables])]
-    .map((c) => c + " ")
-    .sort();
-  const hits = [...new Set(allCompletions.filter((c) => c.startsWith(line)))];
-  if (hits.length === 1) {
-    const completion = hits[0];
-    return [[completion], line];
-  }
-  else if (hits.length === 0 || counter % 2) {
+  const all = [...new Set([...builtinNames, ...pathExecutables])];
+  const trie = new Trie();
+  for (const word of all) trie.insert(word);
+  return trie;
+}
+
+function completer(line: string): [string[], string] {
+  const trie = buildTrie();
+  const matchCount = trie.countMatches(line);
+
+  if (matchCount === 0) {
     process.stdout.write('\x07');
+    return [[], line];
   }
-  else {
-    const hitsOut = hits.join("");
-    process.stdout.write("\n" + hitsOut + "\n");
-    rl.write(null, { ctrl: true, name: 'u' })
+
+  if (matchCount === 1) {
+    const completed = trie.lcp(line) + " ";
+    return [[completed], line];
+  }
+
+  const lcpResult = trie.lcp(line);
+  if (lcpResult !== line) {
+    return [[lcpResult], line];
+  }
+
+  if (prevLine === line) {
+    const allMatches = trie.getAllMatches(line);
+    process.stdout.write("\n" + allMatches.join("  ") + "\n");
+    rl.write(null, { ctrl: true, name: 'u' });
     prompt();
     rl.write(line);
+    prevLine = "";
+  } else {
+    process.stdout.write('\x07');
+    prevLine = line;
   }
+
   return [[], line];
 }
+
 
 const rl = createInterface({
   input: process.stdin,
@@ -88,7 +102,6 @@ const findExecutable = (command: string): string | null => {
   return null;
 };
 
-// Unified output writer — handles stdout/stderr with append or overwrite
 const writeToTarget = (data: string, file: string | null, append: string | null, stream: NodeJS.WriteStream) => {
   if (file) fs.writeFileSync(file, data, 'utf8');
   else if (append) fs.appendFileSync(append, data);
@@ -146,10 +159,10 @@ const extractRedirect = (tokens: string[]): RedirectInfo => {
 
   for (let i = 0; i < tokens.length; i++) {
     switch (tokens[i]) {
-      case '>': case '1>':  stdoutFile      = tokens[++i] ?? null; break;
-      case '2>':            stderrFile      = tokens[++i] ?? null; break;
-      case '>>': case '1>>':appendStdOutFile= tokens[++i] ?? null; break;
-      case '2>>':           appendStdErrFile= tokens[++i] ?? null; break;
+      case '>': case '1>':   stdoutFile       = tokens[++i] ?? null; break;
+      case '2>':             stderrFile       = tokens[++i] ?? null; break;
+      case '>>': case '1>>': appendStdOutFile = tokens[++i] ?? null; break;
+      case '2>>':            appendStdErrFile = tokens[++i] ?? null; break;
       default: cmdArgs.push(tokens[i]);
     }
   }
