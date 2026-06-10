@@ -201,6 +201,16 @@ const builtins: Record<string, BuiltinFn> = {
     const target = args[0] === "~" ? HOME_DIR : args[0];
     changeDirectory(target, r.stderrFile, r.appendStdErrFile);
     prompt();
+  },
+
+  complete: (args, r) => {
+    const flag = args[0];
+    const command = args[1];
+    if (flag === "-p") {
+      const output = `complete: ${command}: no completion specification`;
+      writeToTarget(output, r.stdoutFile, r.appendStdOutFile, process.stdout);
+    }
+    prompt();
   }
 };
 
