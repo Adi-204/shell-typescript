@@ -18,12 +18,12 @@ const executeCommand = async (script: string | undefined): Promise<string> => {
   if (!script) return "";
   try {
     const { stdout } = await execPromise(script);
-    return stdout.trim() + " ";  
+    return stdout.trim() + " ";
   } catch (error: any) {
     console.error(`Error: ${error.message}`);
     return "";
   }
-}
+};
 
 function getPathExecutables(): string[] {
   const executables: string[] = [];
@@ -57,14 +57,24 @@ function buildTrie(): Trie {
 }
 
 async function completer(line: string): Promise<[string[], string]> {
+  const parts = line.split(' ');
+  const command = parts[0];
+
+  if (parts.length > 1) {
+    if (command && completerScripts.has(command)) {
+      const script = completerScripts.get(command);
+      const output = await executeCommand(script);
+      const lastWord = parts[parts.length - 1]; 
+      return [[output], lastWord];
+    } else {
+      process.stdout.write('\x07');
+      return [[], line];
+    }
+  }
+
+  // Completing the command name itself (no spaces)
   const trie = buildTrie();
   const matchCount = trie.countMatches(line);
-
-  if (completerScripts.has(line.slice(0, -1))) {
-    const script = completerScripts.get(line.slice(0, -1));
-    const output = await executeCommand(script);
-    return [[output], line];
-  }
 
   if (matchCount === 0) {
     process.stdout.write('\x07');
