@@ -60,7 +60,7 @@ async function completer(line: string): Promise<[string[], string]> {
   process.env.COMP_LINE = line;
   process.env.COMP_POINT = line.length;
   const parts = line.split(' ');
-  const command = parts[0];
+  const command = parts.length > 0 ? parts[0] : '';
   const prevWord = parts.length > 1 ? parts[1] : '';
   const currentWord = parts.length > 2 ? parts[2] : ''; 
 
@@ -72,8 +72,16 @@ async function completer(line: string): Promise<[string[], string]> {
       if (!output || !output.trimEnd().startsWith(lastWord)) {
         process.stdout.write('\x07');
         return [[], line];
+      } else if (prevLine === line) {
+        const allMatches = output.split('\n');
+        process.stdout.write("\n" + allMatches.join("  ") + "\n");
+        rl.write(null, { ctrl: true, name: 'u' });
+        prompt();
+        rl.write(line);
+        prevLine = "";
+      } else {
+        return [[output], lastWord];
       }
-      return [[output], lastWord];
     } else {
       process.stdout.write('\x07');
       return [[], line];
