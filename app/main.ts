@@ -64,7 +64,13 @@ async function completer(line: string): Promise<[string[], string]> {
     if (command && completerScripts.has(command)) {
       const script = completerScripts.get(command);
       const output = await executeCommand(script);
-      const lastWord = parts[parts.length - 1]; 
+      const lastWord = parts[parts.length - 1];
+      // Filter by what user has already typed for this word, so readline
+      // appends only the remaining portion (and the trailing space).
+      if (!output || !output.trimEnd().startsWith(lastWord)) {
+        process.stdout.write('\x07');
+        return [[], line];
+      }
       return [[output], lastWord];
     } else {
       process.stdout.write('\x07');
@@ -108,7 +114,11 @@ async function completer(line: string): Promise<[string[], string]> {
 
 const rl = createInterface({
   input: process.stdin,
-  completer: completer,
+  completer: (line: string, callback: (err: null, result: [string[], string]) => void) => {
+    completer(line)
+      .then((result) => callback(null, result))
+      .catch(() => callback(null, [[], line]));
+  },
   output: process.stdout,
   prompt: "$ "
 });
