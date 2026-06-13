@@ -17,11 +17,20 @@ const completerScripts = new Map<string, string>();
 const executeCommand = async (script: string, command: string, currentWord: string, prevWord: string): Promise<string> => {
   try {
     const { stdout } = await execFilePromise(script, [command, currentWord, prevWord]);
-    return stdout.trim() + " ";
+    return stdout.trim();
   } catch {
     return "";
   }
 };
+
+function lcpOfStrings(strings: string[]): string {
+  if (strings.length === 0) return "";
+  return strings.reduce((prefix, s) => {
+    let i = 0;
+    while (i < prefix.length && i < s.length && prefix[i] === s[i]) i++;
+    return prefix.slice(0, i);
+  });
+}
 
 function getPathExecutables(): string[] {
   const executables: string[] = [];
@@ -60,26 +69,40 @@ async function completer(line: string): Promise<[string[], string]> {
   const parts = line.split(' ');
   const command = parts[0] ?? '';
   const currentWord = parts[parts.length - 1] ?? '';
-  const prevWord = parts.length >= 3 ? parts[parts.length - 2] : '';
+  const prevWord = parts.length >= 2 ? parts[parts.length - 2] : '';
 
   if (parts.length > 1) {
     if (command && completerScripts.has(command)) {
       const script = completerScripts.get(command)!;
       const output = await executeCommand(script, command, currentWord, prevWord);
       const lastWord = parts[parts.length - 1];
-      if (!output || !output.trimEnd().startsWith(lastWord)) {
+      const matches = output.split('\n').map((m) => m.trim()).filter((m) => m.length > 0);
+
+      if (matches.length === 0 || !matches.every((m) => m.startsWith(lastWord))) {
         process.stdout.write('\x07');
         return [[], line];
-      } else if (prevLine === line) {
-        const allMatches = output.split('\n');
-        process.stdout.write("\n" + allMatches.join("  ") + "\n");
+      }
+
+      if (matches.length === 1) {
+        return [[matches[0] + " "], lastWord];
+      }
+
+      const lcpResult = lcpOfStrings(matches);
+      if (lcpResult !== lastWord) {
+        return [[lcpResult], lastWord];
+      }
+
+      if (prevLine === line) {
+        process.stdout.write("\n" + matches.join("  ") + "\n");
         rl.write(null, { ctrl: true, name: 'u' });
         prompt();
         rl.write(line);
         prevLine = "";
       } else {
-        return [[output], lastWord];
+        process.stdout.write('\x07');
+        prevLine = line;
       }
+      return [[], line];
     } else {
       process.stdout.write('\x07');
       return [[], line];
