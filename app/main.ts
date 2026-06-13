@@ -1,11 +1,11 @@
 import { createInterface } from "readline";
 import path from 'path';
 import fs from 'fs';
-import { execFile, exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { Trie } from './trie';
 
-const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 
 const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd", "complete"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
@@ -14,13 +14,11 @@ const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 let prevLine = "";
 const completerScripts = new Map<string, string>();
 
-const executeCommand = async (script: string | undefined, command: string | undefined, prevWord: string | undefined, currentWord: string | undefined): Promise<string> => {
-  if (!script) return "";
+const executeCommand = async (script: string, command: string, currentWord: string, prevWord: string): Promise<string> => {
   try {
-    const { stdout } = await execPromise(`${script} ${command} ${currentWord} ${prevWord}`);
+    const { stdout } = await execFilePromise(script, [command, currentWord, prevWord]);
     return stdout.trim() + " ";
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
+  } catch {
     return "";
   }
 };
@@ -60,14 +58,14 @@ async function completer(line: string): Promise<[string[], string]> {
   process.env.COMP_LINE = line;
   process.env.COMP_POINT = line.length;
   const parts = line.split(' ');
-  const command = parts.length > 0 ? parts[0] : '';
-  const prevWord = parts.length > 1 ? parts[1] : '';
-  const currentWord = parts.length > 2 ? parts[2] : ''; 
+  const command = parts[0] ?? '';
+  const currentWord = parts[parts.length - 1] ?? '';
+  const prevWord = parts.length >= 3 ? parts[parts.length - 2] : '';
 
   if (parts.length > 1) {
     if (command && completerScripts.has(command)) {
-      const script = completerScripts.get(command);
-      const output = await executeCommand(script, command, prevWord, currentWord);
+      const script = completerScripts.get(command)!;
+      const output = await executeCommand(script, command, currentWord, prevWord);
       const lastWord = parts[parts.length - 1];
       if (!output || !output.trimEnd().startsWith(lastWord)) {
         process.stdout.write('\x07');
