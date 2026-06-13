@@ -17,7 +17,7 @@ const completerScripts = new Map<string, string>();
 const executeCommand = async (script: string | undefined, command: string | undefined, secondParam: string | undefined, thirdParam: string | undefined): Promise<string> => {
   if (!script) return "";
   try {
-    const { stdout } = await execPromise(`${script} ${command} ${secondParam} ${thirdParam}`);
+    const { stdout } = await execPromise(`${script} ${command} ${thirdParam} ${secondParam}`);
     return stdout.trim() + " ";
   } catch (error: any) {
     console.error(`Error: ${error.message}`);
