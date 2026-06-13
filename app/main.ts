@@ -14,10 +14,10 @@ const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 let prevLine = "";
 const completerScripts = new Map<string, string>();
 
-const executeCommand = async (script: string | undefined, command: string | undefined, secondParam: string | undefined, thirdParam: string | undefined): Promise<string> => {
+const executeCommand = async (script: string | undefined, command: string | undefined, prevWord: string | undefined, currentWord: string | undefined): Promise<string> => {
   if (!script) return "";
   try {
-    const { stdout } = await execPromise(`${script} ${command} ${thirdParam} ${secondParam}`);
+    const { stdout } = await execPromise(`${script} ${command} ${currentWord} ${prevWord}`);
     return stdout.trim() + " ";
   } catch (error: any) {
     console.error(`Error: ${error.message}`);
@@ -57,15 +57,17 @@ function buildTrie(): Trie {
 }
 
 async function completer(line: string): Promise<[string[], string]> {
+  process.env.COMP_LINE = line;
+  process.env.COMP_POINT = line.length;
   const parts = line.split(' ');
   const command = parts[0];
-  const secondParam = parts.length > 1 ? parts[1] : '';
-  const thirdParam = parts.length > 2 ? parts[2] : ''; 
+  const prevWord = parts.length > 1 ? parts[1] : '';
+  const currentWord = parts.length > 2 ? parts[2] : ''; 
 
   if (parts.length > 1) {
     if (command && completerScripts.has(command)) {
       const script = completerScripts.get(command);
-      const output = await executeCommand(script, command, secondParam, thirdParam);
+      const output = await executeCommand(script, command, prevWord, currentWord);
       const lastWord = parts[parts.length - 1];
       if (!output || !output.trimEnd().startsWith(lastWord)) {
         process.stdout.write('\x07');
@@ -93,7 +95,7 @@ async function completer(line: string): Promise<[string[], string]> {
 
   const lcpResult = trie.lcp(line);
   if (lcpResult !== line) {
-    return [[lcpResult], line];
+    return [[lcpResult], line]; 
   }
 
   if (prevLine === line) {
