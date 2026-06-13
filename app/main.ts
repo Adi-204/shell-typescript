@@ -14,10 +14,10 @@ const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
 let prevLine = "";
 const completerScripts = new Map<string, string>();
 
-const executeCommand = async (script: string | undefined): Promise<string> => {
+const executeCommand = async (script: string | undefined, command: string | undefined, secondParam: string | undefined, thirdParam: string | undefined): Promise<string> => {
   if (!script) return "";
   try {
-    const { stdout } = await execPromise(script);
+    const { stdout } = await execPromise(`${script} ${command} ${secondParam} ${thirdParam}`);
     return stdout.trim() + " ";
   } catch (error: any) {
     console.error(`Error: ${error.message}`);
@@ -59,14 +59,14 @@ function buildTrie(): Trie {
 async function completer(line: string): Promise<[string[], string]> {
   const parts = line.split(' ');
   const command = parts[0];
+  const secondParam = parts.length > 1 ? parts[1] : '';
+  const thirdParam = parts.length > 2 ? parts[2] : ''; 
 
   if (parts.length > 1) {
     if (command && completerScripts.has(command)) {
       const script = completerScripts.get(command);
-      const output = await executeCommand(script);
+      const output = await executeCommand(script, command, secondParam, thirdParam);
       const lastWord = parts[parts.length - 1];
-      // Filter by what user has already typed for this word, so readline
-      // appends only the remaining portion (and the trailing space).
       if (!output || !output.trimEnd().startsWith(lastWord)) {
         process.stdout.write('\x07');
         return [[], line];
@@ -78,7 +78,6 @@ async function completer(line: string): Promise<[string[], string]> {
     }
   }
 
-  // Completing the command name itself (no spaces)
   const trie = buildTrie();
   const matchCount = trie.countMatches(line);
 
