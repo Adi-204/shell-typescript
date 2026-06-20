@@ -7,7 +7,7 @@ import { Trie } from './trie';
 
 const execFilePromise = promisify(execFile);
 
-const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd", "complete"]);
+const BUILTINS = new Set<string>(["echo", "exit", "type", "pwd", "cd", "complete", "jobs"]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
 const BACKSLASH_IN_DOUBLE_QUOTES = new Set<string>(['"', '\\']);
@@ -298,6 +298,10 @@ const builtins: Record<string, BuiltinFn> = {
         completerScripts.delete(command);
       }
     }
+    prompt();
+  },
+
+  jobs: (args, r) => {
     prompt();
   }
 };
