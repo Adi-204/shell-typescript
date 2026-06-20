@@ -290,6 +290,13 @@ const builtins: Record<string, BuiltinFn> = {
         output = `complete: ${command}: no completion specification\n`;
       }
       writeToTarget(output, r.stdoutFile, r.appendStdOutFile, process.stdout);
+    } 
+    else if (flag === "-r") {
+      const command = args[1];
+      let output = "";
+      if (completerScripts.has(command)) {
+        completerScripts.delete(command);
+      }
     }
     prompt();
   }
