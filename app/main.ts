@@ -410,8 +410,8 @@ const builtins: Record<string, BuiltinFn> = {
     }
     if (output.length) {
       output = output.slice(0, -1);
+      console.log(output);
     }
-    console.log(output);
     prompt();
   },
 };
