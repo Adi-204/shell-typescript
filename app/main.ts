@@ -34,14 +34,14 @@ let currentJobNumber = 1;
 const runProcessInBackground = (command: string, args: Array<string>) => {
   const bgProcess = spawn(command, args, {
     detached: true,
-    stdio: "inherit"
+    stdio: "inherit",
   });
   bgProcess.unref();
   const job: Job = {
     jobNumber: currentJobNumber++,
     process: bgProcess,
     command: command,
-    args: args
+    args: args,
   };
   jobs.push(job);
 };
@@ -401,11 +401,17 @@ const builtins: Record<string, BuiltinFn> = {
 
   jobs: () => {
     let output = "";
-    for (let i = 0; i < jobs.length; i++){
+    for (let i = 0; i < jobs.length; i++) {
       const currentBgProcess = jobs[i];
       if (!currentBgProcess?.process?.exitCode) {
-        const fullCommand = `${currentBgProcess.command} ${currentBgProcess.args.join(' ')} &`
-        output += `[${currentBgProcess.jobNumber}]+ Running                        ${fullCommand}\n`;
+        const fullCommand = `${currentBgProcess.command} ${currentBgProcess.args.join(" ")} &`;
+        if (i === jobs.length - 1) {
+          output += `[${currentBgProcess.jobNumber}]+ Running                        ${fullCommand}\n`;
+        } else if (i === jobs.length - 2) {
+          output += `[${currentBgProcess.jobNumber}]- Running                        ${fullCommand}\n`;
+        } else {
+          output += `[${currentBgProcess.jobNumber}] Running                        ${fullCommand}\n`;
+        }
       }
     }
     if (output.length) {
