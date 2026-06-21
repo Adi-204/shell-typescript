@@ -25,6 +25,8 @@ const completerScripts = new Map<string, string>();
 interface Job {
   jobNumber: number;
   process: ChildProcess;
+  command: string;
+  args: Array<string>;
 }
 const jobs: Job[] = [];
 let currentJobNumber = 1;
@@ -32,12 +34,14 @@ let currentJobNumber = 1;
 const runProcessInBackground = (command: string, args: Array<string>) => {
   const bgProcess = spawn(command, args, {
     detached: true,
-    stdio: "inherit",
+    stdio: "inherit"
   });
   bgProcess.unref();
   const job: Job = {
     jobNumber: currentJobNumber++,
     process: bgProcess,
+    command: command,
+    args: args
   };
   jobs.push(job);
 };
@@ -396,6 +400,18 @@ const builtins: Record<string, BuiltinFn> = {
   },
 
   jobs: () => {
+    let output = "";
+    for (let i = 0; i < jobs.length; i++){
+      const currentBgProcess = jobs[i];
+      if (!currentBgProcess?.process?.exitCode) {
+        const fullCommand = `${currentBgProcess.command} ${currentBgProcess.args.join(' ')} &`
+        output += `[${currentBgProcess.jobNumber}]+ Running                        ${fullCommand}\n`;
+      }
+    }
+    if (output.length) {
+      output = output.slice(0, -1);
+    }
+    console.log(output);
     prompt();
   },
 };
