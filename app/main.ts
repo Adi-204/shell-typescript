@@ -24,7 +24,7 @@ let prevLine = "";
 const completerScripts = new Map<string, string>();
 interface Job {
   jobNumber: number;
-  pid: number;
+  process: ChildProcess;
 }
 const jobs: Job[] = [];
 let currentJobNumber = 1;
@@ -32,12 +32,12 @@ let currentJobNumber = 1;
 const runProcessInBackground = (command: string, args: Array<string>) => {
   const bgProcess = spawn(command, args, {
     detached: true,
-    stdio: "ignore",
+    stdio: "inherit",
   });
   bgProcess.unref();
   const job: Job = {
     jobNumber: currentJobNumber++,
-    pid: bgProcess.pid!
+    process: bgProcess,
   };
   jobs.push(job);
 };
@@ -416,7 +416,7 @@ rl.on("line", (input) => {
     args.pop();
     runProcessInBackground(command, args);
     const lastJob = jobs.at(-1);
-    console.log(`[${lastJob?.jobNumber}] ${lastJob?.pid}`);
+    console.log(`[${lastJob?.jobNumber}] ${lastJob?.process.pid}`);
     prompt();
     return;
   }
