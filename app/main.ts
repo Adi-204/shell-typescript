@@ -410,7 +410,7 @@ const builtins: Record<string, BuiltinFn> = {
         } else if (i === jobs.length - 2) {
           output += `[${currentBgProcess.jobNumber}]- Running                        ${fullCommand}\n`;
         } else {
-          output += `[${currentBgProcess.jobNumber}] Running                        ${fullCommand}\n`;
+          output += `[${currentBgProcess.jobNumber}]  Running                        ${fullCommand}\n`;
         }
       }
     }
