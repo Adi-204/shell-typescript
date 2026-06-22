@@ -16,7 +16,7 @@ const BUILTINS = new Set<string>([
   "cd",
   "complete",
   "jobs",
-  "history"
+  "history",
 ]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
@@ -42,11 +42,11 @@ const runProcessInBackground = (command: string, args: Array<string>) => {
   let currentJobNumber = 1;
   if (jobs.length) {
     let maxJobNumber = 1;
-    for (let i = 0; i < jobs.length; i++){
+    for (let i = 0; i < jobs.length; i++) {
       maxJobNumber = Math.max(maxJobNumber, jobs[i].jobNumber);
     }
     currentJobNumber = maxJobNumber + 1;
-  } 
+  }
   const job: Job = {
     jobNumber: currentJobNumber,
     process: bgProcess,
@@ -238,8 +238,11 @@ const reapDoneJobs = () => {
     const job = jobs[i];
     if (!job.exited) continue;
     const baseCommand = `${job.command} ${job.args.join(" ")}`;
-    const marker = i === jobs.length - 1 ? "+" : i === jobs.length - 2 ? "-" : " ";
-    console.log(`[${job.jobNumber}]${marker} Done                    ${baseCommand}`);
+    const marker =
+      i === jobs.length - 1 ? "+" : i === jobs.length - 2 ? "-" : " ";
+    console.log(
+      `[${job.jobNumber}]${marker} Done                    ${baseCommand}`,
+    );
     jobs.splice(i, 1);
   }
 };
@@ -440,7 +443,8 @@ const builtins: Record<string, BuiltinFn> = {
     for (let i = 0; i < jobs.length; i++) {
       const job = jobs[i];
       const baseCommand = `${job.command} ${job.args.join(" ")}`;
-      const marker = i === jobs.length - 1 ? "+" : i === jobs.length - 2 ? "-" : " ";
+      const marker =
+        i === jobs.length - 1 ? "+" : i === jobs.length - 2 ? "-" : " ";
       if (job.exited) {
         output += `[${job.jobNumber}]${marker} Done                    ${baseCommand}\n`;
       } else {
@@ -457,17 +461,24 @@ const builtins: Record<string, BuiltinFn> = {
     prompt();
   },
 
-  history: () => {
+  history: (args) => {
     let output = "";
-    for (let i = 0; i < commandsHistory.length; i++) {
-      output += `${i + 1} ${commandsHistory[i]}\n`;
+    if (args) {
+      const numberOfCommands = Number(args[0]);
+      for (let i = commandsHistory.length - numberOfCommands; i < commandsHistory.length; i++) {
+        output += `${i + 1} ${commandsHistory[i]}\n`;
+      }
+    } else {
+      for (let i = 0; i < commandsHistory.length; i++) {
+        output += `${i + 1} ${commandsHistory[i]}\n`;
+      }
     }
     if (output.length) {
       output = output.slice(0, -1);
       console.log(output);
     }
     prompt();
-  }
+  },
 };
 
 rl.on("line", (input) => {
