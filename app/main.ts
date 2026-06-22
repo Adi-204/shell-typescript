@@ -31,6 +31,7 @@ interface Job {
   exited: boolean;
 }
 const jobs: Job[] = [];
+const commandsHistory: Array<String> = [];
 
 const runProcessInBackground = (command: string, args: Array<string>) => {
   const bgProcess = spawn(command, args, {
@@ -455,6 +456,18 @@ const builtins: Record<string, BuiltinFn> = {
     }
     prompt();
   },
+
+  history: () => {
+    let output = "";
+    for (let i = 0; i < commandsHistory.length; i++) {
+      output += `${i + 1} ${commandsHistory[i]}\n`;
+    }
+    if (output.length) {
+      output = output.slice(0, -1);
+      console.log(output);
+    }
+    prompt();
+  }
 };
 
 rl.on("line", (input) => {
@@ -468,6 +481,8 @@ rl.on("line", (input) => {
   const redirect = extractRedirect(parsed);
   const [command, ...args] = redirect.cmdArgs;
   const lastToken = args[args.length - 1];
+
+  commandsHistory.push(trimmed);
 
   if (lastToken === "&") {
     args.pop();
