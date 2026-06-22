@@ -16,6 +16,7 @@ const BUILTINS = new Set<string>([
   "cd",
   "complete",
   "jobs",
+  "history"
 ]);
 const PATH_DIRS = process.env.PATH.split(path.delimiter);
 const HOME_DIR = process.env.HOME;
