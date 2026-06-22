@@ -152,7 +152,7 @@ async function completer(line: string): Promise<[string[], string]> {
       if (prevLine === line) {
         process.stdout.write("\n" + matches.join("  ") + "\n");
         rl.write(null, { ctrl: true, name: "u" });
-        prompt();
+        rl.prompt();
         rl.write(line);
         prevLine = "";
       } else {
@@ -188,7 +188,7 @@ async function completer(line: string): Promise<[string[], string]> {
     const allMatches = trie.getAllMatches(line);
     process.stdout.write("\n" + allMatches.join("  ") + "\n");
     rl.write(null, { ctrl: true, name: "u" });
-    prompt();
+    rl.prompt();
     rl.write(line);
     prevLine = "";
   } else {
@@ -213,7 +213,29 @@ const rl = createInterface({
   prompt: "$ ",
 });
 
-const prompt = () => rl.prompt();
+type PromptHook = () => void;
+const beforePromptHooks: PromptHook[] = [];
+const onBeforePrompt = (fn: PromptHook) => {
+  beforePromptHooks.push(fn);
+};
+
+const prompt = () => {
+  for (const hook of beforePromptHooks) hook();
+  rl.prompt();
+};
+
+const reapDoneJobs = () => {
+  for (let i = jobs.length - 1; i >= 0; i--) {
+    const job = jobs[i];
+    if (!job.exited) continue;
+    const baseCommand = `${job.command} ${job.args.join(" ")}`;
+    const marker = i === jobs.length - 1 ? "+" : i === jobs.length - 2 ? "-" : " ";
+    console.log(`[${job.jobNumber}]${marker} Done                    ${baseCommand}`);
+    jobs.splice(i, 1);
+  }
+};
+
+onBeforePrompt(reapDoneJobs);
 
 const isExecutable = (filePath: string): boolean => {
   try {
