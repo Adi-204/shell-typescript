@@ -27,6 +27,7 @@ interface Job {
   process: ChildProcess;
   command: string;
   args: Array<string>;
+  exited: boolean;
 }
 const jobs: Job[] = [];
 let currentJobNumber = 1;
@@ -42,7 +43,11 @@ const runProcessInBackground = (command: string, args: Array<string>) => {
     process: bgProcess,
     command: command,
     args: args,
+    exited: false,
   };
+  bgProcess.on("exit", (code) => {
+    if (code !== null) job.exited = true;
+  });
   jobs.push(job);
 };
 
@@ -402,21 +407,21 @@ const builtins: Record<string, BuiltinFn> = {
   jobs: () => {
     let output = "";
     for (let i = 0; i < jobs.length; i++) {
-      const currentBgProcess = jobs[i];
-      if (!currentBgProcess?.process?.exitCode) {
-        const fullCommand = `${currentBgProcess.command} ${currentBgProcess.args.join(" ")} &`;
-        if (i === jobs.length - 1) {
-          output += `[${currentBgProcess.jobNumber}]+ Running                        ${fullCommand}\n`;
-        } else if (i === jobs.length - 2) {
-          output += `[${currentBgProcess.jobNumber}]- Running                        ${fullCommand}\n`;
-        } else {
-          output += `[${currentBgProcess.jobNumber}]  Running                        ${fullCommand}\n`;
-        }
+      const job = jobs[i];
+      const baseCommand = `${job.command} ${job.args.join(" ")}`;
+      const marker = i === jobs.length - 1 ? "+" : i === jobs.length - 2 ? "-" : " ";
+      if (job.exited) {
+        output += `[${job.jobNumber}]${marker} Done                    ${baseCommand}\n`;
+      } else {
+        output += `[${job.jobNumber}]${marker} Running                 ${baseCommand} &\n`;
       }
     }
     if (output.length) {
       output = output.slice(0, -1);
       console.log(output);
+    }
+    for (let i = jobs.length - 1; i >= 0; i--) {
+      if (jobs[i].exited) jobs.splice(i, 1);
     }
     prompt();
   },
