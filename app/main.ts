@@ -463,7 +463,7 @@ const builtins: Record<string, BuiltinFn> = {
 
   history: (args) => {
     let output = "";
-    if (args) {
+    if (args.length) {
       const numberOfCommands = Number(args[0]);
       for (let i = commandsHistory.length - numberOfCommands; i < commandsHistory.length; i++) {
         output += `${i + 1} ${commandsHistory[i]}\n`;
