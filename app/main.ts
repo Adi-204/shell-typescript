@@ -30,8 +30,6 @@ interface Job {
   exited: boolean;
 }
 const jobs: Job[] = [];
-let currentJobNumber = 1;
-let maxJobNumber = 1;
 
 const runProcessInBackground = (command: string, args: Array<string>) => {
   const bgProcess = spawn(command, args, {
@@ -39,13 +37,14 @@ const runProcessInBackground = (command: string, args: Array<string>) => {
     stdio: "inherit",
   });
   bgProcess.unref();
+  let currentJobNumber = 1;
   if (jobs.length) {
-    maxJobNumber++;
-    currentJobNumber = maxJobNumber;
-  } else {
-    currentJobNumber = 1;
-    maxJobNumber = 1;
-  }
+    let maxJobNumber = 1;
+    for (let i = 0; i < jobs.length; i++){
+      maxJobNumber = Math.max(maxJobNumber, jobs[i].jobNumber);
+    }
+    currentJobNumber = maxJobNumber + 1;
+  } 
   const job: Job = {
     jobNumber: currentJobNumber,
     process: bgProcess,
