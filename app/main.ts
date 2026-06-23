@@ -62,22 +62,6 @@ const runProcessInBackground = (command: string, args: Array<string>) => {
   };
   bgProcess.on("exit", (code) => {
     if (code !== null) job.exited = true;
-
-    if (promptActive) {
-      const buf = rl.line;
-      const idx = jobs.indexOf(job);
-      const marker =
-        idx === jobs.length - 1
-          ? "+"
-          : idx === jobs.length - 2
-            ? "-"
-            : " ";
-      process.stdout.write("\r\x1b[2K");
-      console.log(formatDoneLine(job, marker));
-      if (idx >= 0) jobs.splice(idx, 1);
-      rl.prompt();
-      if (buf) rl.write(buf);
-    }
   });
   jobs.push(job);
 };
@@ -251,9 +235,11 @@ const onBeforePrompt = (fn: PromptHook) => {
 };
 
 const prompt = () => {
-  for (const hook of beforePromptHooks) hook();
-  rl.prompt();
-  promptActive = true;
+  setImmediate(() => {
+    for (const hook of beforePromptHooks) hook();
+    rl.prompt();
+    promptActive = true;
+  });
 };
 
 const reapDoneJobs = () => {
