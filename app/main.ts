@@ -32,6 +32,12 @@ interface Job {
 }
 const jobs: Job[] = [];
 const commandsHistory: Array<String> = [];
+let promptActive = false;
+
+const formatDoneLine = (job: Job, marker: string): string => {
+  const baseCommand = `${job.command} ${job.args.join(" ")}`;
+  return `[${job.jobNumber}]${marker}  Done                 ${baseCommand}`;
+};
 
 const runProcessInBackground = (command: string, args: Array<string>) => {
   const bgProcess = spawn(command, args, {
@@ -56,6 +62,22 @@ const runProcessInBackground = (command: string, args: Array<string>) => {
   };
   bgProcess.on("exit", (code) => {
     if (code !== null) job.exited = true;
+
+    if (promptActive) {
+      const buf = rl.line;
+      const idx = jobs.indexOf(job);
+      const marker =
+        idx === jobs.length - 1
+          ? "+"
+          : idx === jobs.length - 2
+            ? "-"
+            : " ";
+      process.stdout.write("\r\x1b[2K");
+      console.log(formatDoneLine(job, marker));
+      if (idx >= 0) jobs.splice(idx, 1);
+      rl.prompt();
+      if (buf) rl.write(buf);
+    }
   });
   jobs.push(job);
 };
@@ -231,18 +253,16 @@ const onBeforePrompt = (fn: PromptHook) => {
 const prompt = () => {
   for (const hook of beforePromptHooks) hook();
   rl.prompt();
+  promptActive = true;
 };
 
 const reapDoneJobs = () => {
   for (let i = jobs.length - 1; i >= 0; i--) {
     const job = jobs[i];
     if (!job.exited) continue;
-    const baseCommand = `${job.command} ${job.args.join(" ")}`;
     const marker =
       i === jobs.length - 1 ? "+" : i === jobs.length - 2 ? "-" : " ";
-    console.log(
-      `[${job.jobNumber}]${marker} Done                    ${baseCommand}`,
-    );
+    console.log(formatDoneLine(job, marker));
     jobs.splice(i, 1);
   }
 };
@@ -446,7 +466,7 @@ const builtins: Record<string, BuiltinFn> = {
       const marker =
         i === jobs.length - 1 ? "+" : i === jobs.length - 2 ? "-" : " ";
       if (job.exited) {
-        output += `[${job.jobNumber}]${marker} Done                    ${baseCommand}\n`;
+        output += formatDoneLine(job, marker) + "\n";
       } else {
         output += `[${job.jobNumber}]${marker} Running                 ${baseCommand} &\n`;
       }
@@ -482,6 +502,7 @@ const builtins: Record<string, BuiltinFn> = {
 };
 
 rl.on("line", (input) => {
+  promptActive = false;
   const trimmed = input.trim();
   if (!trimmed) {
     prompt();
